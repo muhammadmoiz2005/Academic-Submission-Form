@@ -7,7 +7,7 @@ import hashlib
 from pathlib import Path
 import base64
 import qrcode
-from io import BytesIO, StringIO
+from io import BytesIO
 import secrets
 import string
 
@@ -28,10 +28,12 @@ FORM_CONTENT_FILE = os.path.join(DATA_DIR, "form_content.json")
 SHORT_URLS_FILE = os.path.join(DATA_DIR, "short_urls.json")
 ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 FILE_SUBMISSION_FILE = os.path.join(DATA_DIR, "file_submission.json")
+FILE_SUBMISSIONS_FILE = os.path.join(DATA_DIR, "file_submissions.json")
 
 # Create data directories if they don't exist
 Path(DATA_DIR).mkdir(exist_ok=True)
 Path(ARCHIVE_DIR).mkdir(exist_ok=True)
+Path(os.path.join(DATA_DIR, "submitted_files")).mkdir(exist_ok=True)
 
 def generate_short_code(length=8):
     """Generate a random short code for URLs"""
@@ -52,10 +54,13 @@ def archive_data(data_type, data, reason=""):
         "reason": reason
     }
     
-    with open(filepath, 'w') as f:
-        json.dump(archive_record, f, indent=4)
-    
-    return filepath
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(archive_record, f, indent=4)
+        return filepath
+    except Exception as e:
+        st.error(f"Error archiving data: {e}")
+        return None
 
 # Initialize data files
 def init_files():
@@ -85,15 +90,15 @@ def init_files():
 This form is for final year students to select their project topics and form groups.
 
 ## Important Instructions:
-1. Form groups of 4-6 members (as specified by your department)
+1. Form groups of 1-4 members (as specified by your department)
 2. The first member will be the group leader
 3. Select only ONE project from the available list
 4. Ensure all information is accurate before submission
 
 ## Submission Guidelines:
-- Deadline: [Insert Deadline Date]
-- Contact: [Insert Coordinator Email]
-- Queries: [Insert Contact Information]
+- Deadline: December 31, 2024
+- Contact: projects@university.edu
+- Queries: Contact project coordinator
             """,
             "background_color": "#ffffff",
             "text_color": "#000000"
@@ -123,27 +128,39 @@ This form is for final year students to select their project topics and form gro
         (ADMIN_CREDENTIALS_FILE, default_admin),
         (FORM_CONTENT_FILE, default_form_content),
         (SHORT_URLS_FILE, {}),
-        (FILE_SUBMISSION_FILE, default_file_submission)
+        (FILE_SUBMISSION_FILE, default_file_submission),
+        (FILE_SUBMISSIONS_FILE, {})
     ]
     
     for file_path, default_data in files_to_init:
         if not os.path.exists(file_path):
-            with open(file_path, 'w') as f:
-                json.dump(default_data, f, indent=4)
+            try:
+                with open(file_path, 'w') as f:
+                    json.dump(default_data, f, indent=4)
+            except Exception as e:
+                st.error(f"Error creating {file_path}: {e}")
 
 # Load and save functions
 def load_data(file_path):
     """Load data from JSON file"""
     try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        return None
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        st.error(f"Error loading {file_path}: {e}")
         return None
 
 def save_data(data, file_path):
     """Save data to JSON file"""
-    with open(file_path, 'w') as f:
-        json.dump(data, f, indent=4)
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        return True
+    except Exception as e:
+        st.error(f"Error saving to {file_path}: {e}")
+        return False
 
 def hash_password(password):
     """Hash password for secure storage"""
@@ -161,19 +178,23 @@ def authenticate(username, password):
 
 def generate_qr_code(url):
     """Generate QR code for a URL"""
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(url)
-    qr.make(fit=True)
-    
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffered = BytesIO()
-    img.save(buffered)
-    return base64.b64encode(buffered.getvalue()).decode()
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        img.save(buffered)
+        return base64.b64encode(buffered.getvalue()).decode()
+    except Exception as e:
+        st.error(f"Error generating QR code: {e}")
+        return None
 
 def get_base_url():
     """Get base URL from config"""
@@ -189,7 +210,6 @@ def display_cover_page(form_content):
     if not cover.get("enabled", True):
         return
     
-    # Cover page without background color
     st.markdown(f'<div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">{cover.get("title", "🎓 Project Allocation")}</div>', unsafe_allow_html=True)
     st.markdown(cover.get("content", ""))
     st.markdown("---")
@@ -266,6 +286,7 @@ def display_file_submission_form(form_content, config):
         group_number = st.number_input(
             "Enter Your Group Number*",
             min_value=1,
+            step=1,
             help="Enter the group number you received after submission"
         )
         
@@ -275,69 +296,82 @@ def display_file_submission_form(form_content, config):
         
         if group_exists:
             # Get group details
-            group = next(g for g in groups if g['group_number'] == group_number)
-            project_name = group.get('project_name', 'N/A')
-            leader_name = ""
-            for member in group.get('members', []):
-                if member.get('is_leader'):
-                    leader_name = member.get('name', '')
-                    break
-            
-            # Show group details
-            st.success(f"✅ Group {group_number} verified!")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info(f"**Group Leader:** {leader_name}")
-            with col2:
-                st.info(f"**Project:** {project_name}")
-            
-            # File upload
-            st.subheader("📎 Upload Files")
-            allowed_formats = file_settings.get("allowed_formats", [".pdf", ".doc", ".docx"])
-            max_size = file_settings.get("max_size_mb", 10) * 1024 * 1024
-            
-            uploaded_files = st.file_uploader(
-                "Upload your project files",
-                type=[fmt.replace('.', '') for fmt in allowed_formats],
-                accept_multiple_files=True,
-                help=f"Allowed formats: {', '.join(allowed_formats)} | Max size: {file_settings.get('max_size_mb', 10)}MB per file"
-            )
-            
-            # Instructions
-            st.info(file_settings.get("instructions", "Please upload your project files."))
-            
-            # Submit button
-            submitted = st.form_submit_button("📤 Submit Files", use_container_width=True)
-            
-            if submitted:
-                if uploaded_files:
-                    # Save file information
-                    file_submissions = load_data("file_submissions.json") or {}
-                    if group_number not in file_submissions:
-                        file_submissions[group_number] = []
-                    
-                    for uploaded_file in uploaded_files:
-                        file_info = {
-                            "filename": uploaded_file.name,
-                            "size": uploaded_file.size,
-                            "uploaded_at": datetime.now().isoformat(),
-                            "project_name": project_name,
-                            "group_leader": leader_name
-                        }
-                        file_submissions[group_number].append(file_info)
+            group = next((g for g in groups if g['group_number'] == group_number), None)
+            if group:
+                project_name = group.get('project_name', 'N/A')
+                leader_name = ""
+                for member in group.get('members', []):
+                    if member.get('is_leader'):
+                        leader_name = member.get('name', '')
+                        break
+                
+                # Show group details
+                st.success(f"✅ Group {group_number} verified!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"**Group Leader:** {leader_name}")
+                with col2:
+                    st.info(f"**Project:** {project_name}")
+                
+                # File upload
+                st.subheader("📎 Upload Files")
+                allowed_formats = file_settings.get("allowed_formats", [".pdf", ".doc", ".docx"])
+                max_size = file_settings.get("max_size_mb", 10) * 1024 * 1024
+                
+                # Convert formats for file_uploader
+                file_types = []
+                for fmt in allowed_formats:
+                    if fmt.startswith('.'):
+                        file_types.append(fmt[1:])  # Remove dot
+                    else:
+                        file_types.append(fmt)
+                
+                uploaded_files = st.file_uploader(
+                    "Upload your project files",
+                    type=file_types,
+                    accept_multiple_files=True,
+                    help=f"Allowed formats: {', '.join(allowed_formats)} | Max size: {file_settings.get('max_size_mb', 10)}MB per file"
+                )
+                
+                # Instructions
+                st.info(file_settings.get("instructions", "Please upload your project files."))
+                
+                # Submit button
+                submitted = st.form_submit_button("📤 Submit Files", use_container_width=True)
+                
+                if submitted:
+                    if uploaded_files:
+                        # Save file information
+                        file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
+                        if str(group_number) not in file_submissions:
+                            file_submissions[str(group_number)] = []
                         
-                        # Save file to disk
-                        file_dir = os.path.join(DATA_DIR, "submitted_files", str(group_number))
-                        Path(file_dir).mkdir(parents=True, exist_ok=True)
-                        file_path = os.path.join(file_dir, uploaded_file.name)
-                        with open(file_path, 'wb') as f:
-                            f.write(uploaded_file.getbuffer())
-                    
-                    save_data(file_submissions, "file_submissions.json")
-                    st.success("✅ Files submitted successfully!")
-                    st.balloons()
-                else:
-                    st.error("❌ Please select at least one file to upload")
+                        for uploaded_file in uploaded_files:
+                            file_info = {
+                                "filename": uploaded_file.name,
+                                "size": uploaded_file.size,
+                                "uploaded_at": datetime.now().isoformat(),
+                                "project_name": project_name,
+                                "group_leader": leader_name
+                            }
+                            file_submissions[str(group_number)].append(file_info)
+                            
+                            # Save file to disk
+                            file_dir = os.path.join(DATA_DIR, "submitted_files", str(group_number))
+                            Path(file_dir).mkdir(parents=True, exist_ok=True)
+                            file_path = os.path.join(file_dir, uploaded_file.name)
+                            try:
+                                with open(file_path, 'wb') as f:
+                                    f.write(uploaded_file.getbuffer())
+                            except Exception as e:
+                                st.error(f"Error saving file {uploaded_file.name}: {e}")
+                                continue
+                        
+                        save_data(file_submissions, FILE_SUBMISSIONS_FILE)
+                        st.success("✅ Files submitted successfully!")
+                        st.balloons()
+                    else:
+                        st.error("❌ Please select at least one file to upload")
         else:
             st.error("❌ Group number not found. Please check your group number.")
             st.info("You must first submit your project allocation before uploading files.")
@@ -635,9 +669,10 @@ def display_submission_form(form_content, config):
             groups = load_data(GROUPS_FILE) or []
             existing_rolls = set()
             for group in groups:
-                for member in group['members']:
-                    if member['roll_no'].strip():
-                        existing_rolls.add(member['roll_no'].strip())
+                if not group.get('deleted', False):
+                    for member in group['members']:
+                        if member['roll_no'].strip():
+                            existing_rolls.add(member['roll_no'].strip())
             
             duplicate_existing = False
             for roll in unique_rolls:
@@ -659,7 +694,7 @@ def display_submission_form(form_content, config):
                 # Check if project already selected by another group
                 groups_data = load_data(GROUPS_FILE) or []
                 project_already_selected = any(
-                    g['project_name'] == project_choice 
+                    g['project_name'] == project_choice and not g.get('deleted', False)
                     for g in groups_data
                 )
                 
@@ -765,9 +800,9 @@ def manage_form_content():
     with col2:
         if st.button("💾 Save Publication Status"):
             config['form_published'] = form_published
-            save_data(config, CONFIG_FILE)
-            status = "published" if form_published else "unpublished"
-            st.success(f"Form {status} successfully!")
+            if save_data(config, CONFIG_FILE):
+                status = "published" if form_published else "unpublished"
+                st.success(f"Form {status} successfully!")
     
     # File submission toggle
     st.markdown("---")
@@ -781,9 +816,9 @@ def manage_form_content():
     
     if st.button("💾 Save File Submission Settings"):
         config['enable_file_submission'] = file_submission_enabled
-        save_data(config, CONFIG_FILE)
-        status = "enabled" if file_submission_enabled else "disabled"
-        st.success(f"File submission {status} successfully!")
+        if save_data(config, CONFIG_FILE):
+            status = "enabled" if file_submission_enabled else "disabled"
+            st.success(f"File submission {status} successfully!")
     
     if file_submission_enabled:
         # File submission settings
@@ -815,14 +850,14 @@ def manage_form_content():
             height=100
         )
         
-        if st.button("💾 Save File Settings"):
+        if st.button("💾 Save File Settings", key="save_file_settings"):
             file_settings = {
                 "allowed_formats": allowed_formats,
                 "max_size_mb": max_size,
                 "instructions": instructions
             }
-            save_data(file_settings, FILE_SUBMISSION_FILE)
-            st.success("File settings saved!")
+            if save_data(file_settings, FILE_SUBMISSION_FILE):
+                st.success("File settings saved!")
     
     st.markdown("---")
     
@@ -865,8 +900,8 @@ def manage_form_content():
                 "content": cover_content,
                 "last_updated": datetime.now().isoformat()
             }
-            save_data(form_content, FORM_CONTENT_FILE)
-            st.success("Cover page settings saved!")
+            if save_data(form_content, FORM_CONTENT_FILE):
+                st.success("Cover page settings saved!")
     
     with tab2:
         st.subheader("Form Header Configuration")
@@ -897,9 +932,13 @@ def manage_form_content():
         )
         
         if show_deadline:
+            try:
+                deadline_date = datetime.strptime(header.get("deadline", "2024-12-31"), "%Y-%m-%d").date()
+            except:
+                deadline_date = datetime.now().date()
             deadline = st.date_input(
                 "Submission Deadline",
-                value=datetime.strptime(header.get("deadline", "2024-12-31"), "%Y-%m-%d").date()
+                value=deadline_date
             )
             deadline_str = deadline.strftime("%Y-%m-%d")
         else:
@@ -932,8 +971,8 @@ def manage_form_content():
                 "contact_email": contact_email,
                 "last_updated": datetime.now().isoformat()
             }
-            save_data(form_content, FORM_CONTENT_FILE)
-            st.success("Form header settings saved!")
+            if save_data(form_content, FORM_CONTENT_FILE):
+                st.success("Form header settings saved!")
     
     # Reset to defaults button
     st.markdown("---")
@@ -968,9 +1007,9 @@ def manage_short_urls():
                 "clicks": 0,
                 "last_accessed": None
             }
-            save_data(short_urls, SHORT_URLS_FILE)
-            st.success(f"New short URL created!")
-            st.rerun()
+            if save_data(short_urls, SHORT_URLS_FILE):
+                st.success(f"New short URL created!")
+                st.rerun()
     
     st.markdown("---")
     
@@ -981,13 +1020,16 @@ def manage_short_urls():
         url_data = []
         for code, data in short_urls.items():
             short_url = f"{base_url}/?short={code}"
+            created_time = datetime.fromisoformat(data['created_at']).strftime("%Y-%m-%d %H:%M") if data.get('created_at') else "Unknown"
+            last_accessed = datetime.fromisoformat(data['last_accessed']).strftime("%Y-%m-%d %H:%M") if data.get('last_accessed') else "Never"
+            
             url_data.append({
                 "Short Code": code,
                 "Short URL": short_url,
-                "Target URL": data['url'],
+                "Target URL": data.get('url', ''),
                 "Clicks": data.get('clicks', 0),
-                "Created": datetime.fromisoformat(data['created_at']).strftime("%Y-%m-%d %H:%M"),
-                "Last Accessed": datetime.fromisoformat(data['last_accessed']).strftime("%Y-%m-%d %H:%M") if data.get('last_accessed') else "Never"
+                "Created": created_time,
+                "Last Accessed": last_accessed
             })
         
         df_urls = pd.DataFrame(url_data)
@@ -1014,7 +1056,8 @@ def manage_short_urls():
                 # QR Code generation
                 if st.button("📱 Generate QR Code"):
                     qr_base64 = generate_qr_code(short_url)
-                    st.markdown(f'<img src="data:image/png;base64,{qr_base64}" width="150">', unsafe_allow_html=True)
+                    if qr_base64:
+                        st.markdown(f'<img src="data:image/png;base64,{qr_base64}" width="150">', unsafe_allow_html=True)
                 
                 # Delete URL
                 if st.button("🗑️ Delete URL", type="secondary"):
@@ -1022,9 +1065,9 @@ def manage_short_urls():
                     archive_data("short_url", short_urls[selected_code], "Admin deleted short URL")
                     
                     del short_urls[selected_code]
-                    save_data(short_urls, SHORT_URLS_FILE)
-                    st.success(f"Short URL {selected_code} deleted!")
-                    st.rerun()
+                    if save_data(short_urls, SHORT_URLS_FILE):
+                        st.success(f"Short URL {selected_code} deleted!")
+                        st.rerun()
         
         # Copy all URLs
         if st.button("📋 Copy All URLs to Clipboard"):
@@ -1133,9 +1176,9 @@ def manage_group_editing():
                         if st.button(f"🗑️", key=f"delete_member_{selected_group_num}_{i}"):
                             # Remove member from group
                             group_to_edit['members'].pop(i-1)
-                            save_data(groups, GROUPS_FILE)
-                            st.success(f"Member {i} deleted from group {selected_group_num}!")
-                            st.rerun()
+                            if save_data(groups, GROUPS_FILE):
+                                st.success(f"Member {i} deleted from group {selected_group_num}!")
+                                st.rerun()
                     else:
                         st.write("👑 Leader")
             
@@ -1157,9 +1200,9 @@ def manage_group_editing():
                                 "roll_no": new_member_roll.strip(),
                                 "is_leader": False
                             })
-                            save_data(groups, GROUPS_FILE)
-                            st.success("✅ New member added!")
-                            st.rerun()
+                            if save_data(groups, GROUPS_FILE):
+                                st.success("✅ New member added!")
+                                st.rerun()
                     else:
                         st.error("❌ Please enter both name and roll number")
             
@@ -1204,11 +1247,9 @@ def manage_group_editing():
                                     project['status'] = 'Not Selected'
                             break
                     
-                    save_data(groups, GROUPS_FILE)
-                    save_data(projects, PROJECTS_FILE)
-                    
-                    st.success(f"✅ Group {selected_group_num} deleted successfully!")
-                    st.rerun()
+                    if save_data(groups, GROUPS_FILE) and save_data(projects, PROJECTS_FILE):
+                        st.success(f"✅ Group {selected_group_num} deleted successfully!")
+                        st.rerun()
 
 def manage_project_deletion():
     """Manage project deletion"""
@@ -1333,18 +1374,20 @@ def manage_project_deletion():
                                     groups[i]['deleted_reason'] = f"Project '{selected_project}' was deleted"
                                     break
                     
-                    save_data(projects, PROJECTS_FILE)
-                    save_data(groups, GROUPS_FILE)
-                    
-                    st.success(f"✅ Project '{selected_project}' deleted successfully!")
-                    st.rerun()
+                    if save_data(projects, PROJECTS_FILE) and save_data(groups, GROUPS_FILE):
+                        st.success(f"✅ Project '{selected_project}' deleted successfully!")
+                        st.rerun()
 
 def view_deleted_items():
     """View archived/deleted items"""
     st.header("🗂️ View Deleted Items")
     
     # Get all archive files
-    archive_files = [f for f in os.listdir(ARCHIVE_DIR) if f.endswith('.json')]
+    try:
+        archive_files = [f for f in os.listdir(ARCHIVE_DIR) if f.endswith('.json')]
+    except FileNotFoundError:
+        st.info("No deleted items found in archive.")
+        return
     
     if not archive_files:
         st.info("No deleted items found in archive.")
@@ -1356,22 +1399,29 @@ def view_deleted_items():
     # Display archive files
     for filename in archive_files:
         filepath = os.path.join(ARCHIVE_DIR, filename)
-        with open(filepath, 'r') as f:
-            archive_data = json.load(f)
+        try:
+            with open(filepath, 'r') as f:
+                archive_data = json.load(f)
+        except Exception as e:
+            st.error(f"Error loading {filename}: {e}")
+            continue
         
         with st.expander(f"📄 {filename}"):
             st.json(archive_data, expanded=False)
             
             # Download button
-            with open(filepath, 'r') as f:
-                file_content = f.read()
-            
-            st.download_button(
-                label=f"Download {filename}",
-                data=file_content,
-                file_name=filename,
-                mime="application/json"
-            )
+            try:
+                with open(filepath, 'r') as f:
+                    file_content = f.read()
+                
+                st.download_button(
+                    label=f"Download {filename}",
+                    data=file_content,
+                    file_name=filename,
+                    mime="application/json"
+                )
+            except Exception as e:
+                st.error(f"Error reading {filename}: {e}")
 
 def export_data_section():
     """Export data section - CSV format (no openpyxl required)"""
@@ -1426,7 +1476,7 @@ def export_data_section():
         with col2:
             export_format = st.selectbox(
                 "Export Format",
-                ["CSV File", "Excel File (requires openpyxl)"]
+                ["CSV File", "Excel File"]
             )
         
         # Generate file
@@ -1465,7 +1515,7 @@ def export_data_section():
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            if export_format == "Excel File (requires openpyxl)":
+            if export_format == "Excel File":
                 try:
                     # Try to use Excel if openpyxl is available
                     import openpyxl
@@ -1488,8 +1538,7 @@ def export_data_section():
                     st.success(f"✅ Excel file '{filename}' is ready for download!")
                     
                 except ImportError:
-                    st.warning("⚠️ openpyxl module not installed. Please install it using: pip install openpyxl")
-                    st.info("Falling back to CSV format...")
+                    st.warning("⚠️ openpyxl module not installed. Falling back to CSV format...")
                     export_format = "CSV File"
             
             if export_format == "CSV File":
@@ -1585,8 +1634,8 @@ def admin_dashboard():
                             existing_project['deleted'] = False
                             existing_project['status'] = new_project_status
                             existing_project['reactivated_at'] = datetime.now().isoformat()
-                            save_data(projects, PROJECTS_FILE)
-                            st.success(f"Project '{new_project_name}' reactivated successfully!")
+                            if save_data(projects, PROJECTS_FILE):
+                                st.success(f"Project '{new_project_name}' reactivated successfully!")
                         else:
                             st.error("Project with this name already exists!")
                     else:
@@ -1597,9 +1646,9 @@ def admin_dashboard():
                             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "deleted": False
                         })
-                        save_data(projects, PROJECTS_FILE)
-                        st.success(f"Project '{new_project_name}' added successfully!")
-                        st.rerun()
+                        if save_data(projects, PROJECTS_FILE):
+                            st.success(f"Project '{new_project_name}' added successfully!")
+                            st.rerun()
                 else:
                     st.error("Please enter a project name")
         
@@ -1654,9 +1703,9 @@ def admin_dashboard():
                             if project['name'] == project_to_update:
                                 old_status = project['status']
                                 project['status'] = new_status
-                                save_data(projects, PROJECTS_FILE)
-                                st.success(f"Status updated from '{old_status}' to '{new_status}' for '{project_to_update}'!")
-                                st.rerun()
+                                if save_data(projects, PROJECTS_FILE):
+                                    st.success(f"Status updated from '{old_status}' to '{new_status}' for '{project_to_update}'!")
+                                    st.rerun()
                                 break
                     else:
                         st.error("Please select a project")
@@ -1725,9 +1774,9 @@ def admin_dashboard():
                         
                         if st.button("Update Group Status", key=f"update_group_{selected_group_num}"):
                             selected_group['status'] = new_group_status
-                            save_data(groups, GROUPS_FILE)
-                            st.success("Group status updated!")
-                            st.rerun()
+                            if save_data(groups, GROUPS_FILE):
+                                st.success("Group status updated!")
+                                st.rerun()
                     
                     # Display members
                     st.subheader("Group Members")
@@ -1786,8 +1835,8 @@ def admin_dashboard():
             config['max_members'] = max_members
             config['next_group_number'] = int(next_group_num)
             config['base_url'] = base_url.strip()
-            save_data(config, CONFIG_FILE)
-            st.success("Configuration saved successfully!")
+            if save_data(config, CONFIG_FILE):
+                st.success("Configuration saved successfully!")
     
     # Tab 8: Export Data
     with tab8:
@@ -1816,8 +1865,8 @@ def admin_dashboard():
                     st.error("New password must be at least 6 characters long!")
                 else:
                     admin_data["password_hash"] = hash_password(new_password)
-                    save_data(admin_data, ADMIN_CREDENTIALS_FILE)
-                    st.success("Password changed successfully!")
+                    if save_data(admin_data, ADMIN_CREDENTIALS_FILE):
+                        st.success("Password changed successfully!")
 
 def main():
     # Initialize session state
@@ -1843,7 +1892,7 @@ def main():
             return
         else:
             # Invalid short code, show normal page
-            pass
+            st.warning("Invalid short URL code. Please use a valid link.")
     
     # Check if admin is already logged in
     if st.session_state.logged_in:
@@ -1878,6 +1927,6 @@ def main():
                             st.rerun()
                         else:
                             st.error("Invalid username or password")
-        
+
 if __name__ == "__main__":
     main()
