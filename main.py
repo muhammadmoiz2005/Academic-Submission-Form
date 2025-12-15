@@ -5,9 +5,6 @@ import os
 from datetime import datetime
 import hashlib
 from pathlib import Path
-import base64
-import qrcode
-from io import BytesIO
 import secrets
 import string
 
@@ -175,26 +172,6 @@ def authenticate(username, password):
     
     password_hash = hash_password(password)
     return admin_data.get("username") == username and admin_data.get("password_hash") == password_hash
-
-def generate_qr_code(url):
-    """Generate QR code for a URL"""
-    try:
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(url)
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffered = BytesIO()
-        img.save(buffered)
-        return base64.b64encode(buffered.getvalue()).decode()
-    except Exception as e:
-        st.error(f"Error generating QR code: {e}")
-        return None
 
 def get_base_url():
     """Get base URL from config"""
@@ -1038,7 +1015,7 @@ def manage_short_urls():
         # URL actions
         st.subheader("🔧 URL Actions")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         
         with col1:
             selected_code = st.selectbox(
@@ -1050,14 +1027,6 @@ def manage_short_urls():
             if selected_code:
                 short_url = f"{base_url}/?short={selected_code}"
                 st.code(short_url, language="text")
-        
-        with col3:
-            if selected_code:
-                # QR Code generation
-                if st.button("📱 Generate QR Code"):
-                    qr_base64 = generate_qr_code(short_url)
-                    if qr_base64:
-                        st.markdown(f'<img src="data:image/png;base64,{qr_base64}" width="150">', unsafe_allow_html=True)
                 
                 # Delete URL
                 if st.button("🗑️ Delete URL", type="secondary"):
@@ -1522,6 +1491,7 @@ def export_data_section():
                     filename = f"project_allocations_{timestamp}.xlsx"
                     
                     # Save to Excel in memory
+                    from io import BytesIO
                     excel_bytes = BytesIO()
                     with pd.ExcelWriter(excel_bytes, engine='openpyxl') as writer:
                         df_export.to_excel(writer, index=False, sheet_name='Project Allocations')

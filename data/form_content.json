@@ -2,16 +2,16 @@
     "cover_page": {
         "enabled": true,
         "title": "\ud83c\udf93 COAL Project Allocation",
-        "content": "Each group must have at least 1 member and no more than 4 members.\nThe project proposal submission deadline is 16th December.\nLate submissions may not be accepted.\n\nThe project proposal must include the following details:\n     Project title\n    Names and roll numbers of all group members\n    Objective of the project\n   Tools or platform to be used (e.g., 8086 MASM, TASM, NASM)\n   Brief description or flow of how the project will work\n   Expected output, including an example of input and result\n",
-        "last_updated": "2025-12-15T17:00:32.824737"
+        "content": "Each group must have at least 1 member and no more than 3 members.\n\nThe project proposal must include the following details:\n     Project title\n    Names and roll numbers of all group members\n    Objective of the project\n   Tools or platform to be used (e.g., 8086 MASM, TASM, NASM)\n   Brief description or flow of how the project will work\n   Expected output, including an example of input and result\n",
+        "last_updated": "2025-12-15T20:31:23.986247"
     },
     "form_header": {
-        "title": "COAL  Project Selection Form",
+        "title": "COAL Project Selection Form",
         "description": "Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory.",
         "show_deadline": true,
         "deadline": "2025-12-15",
         "show_contact": false,
         "contact_email": "projects@university.edu",
-        "last_updated": "2025-12-15T02:56:28.188826"
+        "last_updated": "2025-12-15T20:32:04.817669"
     }
 }
