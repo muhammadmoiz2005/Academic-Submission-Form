@@ -1,0 +1,16 @@
+{
+    "allowed_formats": [
+        ".docx",
+        ".ppt",
+        ".pptx",
+        ".xls",
+        ".xlsx",
+        ".csv",
+        ".zip",
+        ".rar",
+        ".doc",
+        ".pdf"
+    ],
+    "max_size_mb": 10,
+    "instructions": "Please upload your project files in the specified formats."
+}

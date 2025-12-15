@@ -1,0 +1,32 @@
+[
+    {
+        "group_number": 1,
+        "project_name": "Simple Calculator",
+        "status": "Selected",
+        "members": [
+            {
+                "name": "Muhammad Moiz",
+                "roll_no": "BDA-24S-044",
+                "is_leader": true
+            },
+            {
+                "name": "Muhammad Hasan",
+                "roll_no": "BDA-24S-019",
+                "is_leader": false
+            },
+            {
+                "name": "Muhammad Anus",
+                "roll_no": "BDA-24S-011",
+                "is_leader": false
+            },
+            {
+                "name": "Danish Aijaz",
+                "roll_no": "BDA-24S-023",
+                "is_leader": false
+            }
+        ],
+        "submission_date": "2025-12-15 03:05:31",
+        "submission_timestamp": "2025-12-15T03:05:31.464318",
+        "deleted": false
+    }
+]

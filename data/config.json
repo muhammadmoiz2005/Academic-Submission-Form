@@ -1,0 +1,7 @@
+{
+    "max_members": 3,
+    "next_group_number": 2,
+    "form_published": true,
+    "base_url": "http://localhost:8501",
+    "enable_file_submission": false
+}

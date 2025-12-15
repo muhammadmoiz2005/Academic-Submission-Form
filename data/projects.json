@@ -1,0 +1,142 @@
+[
+    {
+        "name": "Simple Calculator",
+        "status": "Selected",
+        "selected_by": 1,
+        "created_at": "2025-12-15 02:42:11",
+        "deleted": false
+    },
+    {
+        "name": "Number Converter",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:42:30",
+        "deleted": false
+    },
+    {
+        "name": "Text-Base Game",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:42:46",
+        "deleted": false
+    },
+    {
+        "name": "Fibonacci Series Generator",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:43:37",
+        "deleted": false
+    },
+    {
+        "name": "Palindrome Checker",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:44:26",
+        "deleted": false
+    },
+    {
+        "name": "Prime Number Finder",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:44:38",
+        "deleted": false
+    },
+    {
+        "name": "Matrix Multiplication",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:44:44",
+        "deleted": false
+    },
+    {
+        "name": "Simple Encryption Algorithm",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:44:50",
+        "deleted": false
+    },
+    {
+        "name": "Temperature Converter",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:44:56",
+        "deleted": false
+    },
+    {
+        "name": "Sorting Algorithm Visualization",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:45:48",
+        "deleted": false
+    },
+    {
+        "name": "Snake Game",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:46:01",
+        "deleted": false
+    },
+    {
+        "name": "Digital Clock with Date",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:46:11",
+        "deleted": false
+    },
+    {
+        "name": "Tic-Tac-Toe Game",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:46:21",
+        "deleted": false
+    },
+    {
+        "name": "Simple Chat System",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:46:43",
+        "deleted": false
+    },
+    {
+        "name": "Restaurant Billing System",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:46:54",
+        "deleted": false
+    },
+    {
+        "name": "Student Record Menu",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:47:03",
+        "deleted": false
+    },
+    {
+        "name": "ATM Mini System",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:47:11",
+        "deleted": false
+    },
+    {
+        "name": "Library Menu System",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:47:17",
+        "deleted": false
+    },
+    {
+        "name": "Queue and Stack Implementation",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:47:24",
+        "deleted": false
+    },
+    {
+        "name": "Table Generator",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-15 02:47:37",
+        "deleted": false
+    }
+]
