@@ -1,32 +1,34 @@
 [
     {
-        "group_number": 1,
+        "group_number": 2,
         "project_name": "Simple Calculator",
-        "status": "Selected",
+        "status": "Not Selected",
         "members": [
             {
-                "name": "Muhammad Moiz",
-                "roll_no": "BDA-24S-044",
+                "name": "Lish",
+                "roll_no": "1",
                 "is_leader": true
             },
             {
-                "name": "Muhammad Hasan",
-                "roll_no": "BDA-24S-019",
+                "name": "AI",
+                "roll_no": "2",
                 "is_leader": false
             },
             {
-                "name": "Muhammad Anus",
-                "roll_no": "BDA-24S-011",
+                "name": "df",
+                "roll_no": "45",
                 "is_leader": false
             },
             {
-                "name": "Danish Aijaz",
-                "roll_no": "BDA-24S-023",
+                "name": "we",
+                "roll_no": "123",
                 "is_leader": false
             }
         ],
-        "submission_date": "2025-12-15 03:05:31",
-        "submission_timestamp": "2025-12-15T03:05:31.464318",
-        "deleted": false
+        "submission_date": "2025-12-17 22:34:52",
+        "submission_timestamp": "2025-12-17T22:34:52.644003",
+        "deleted": true,
+        "deleted_at": "2025-12-17T22:38:48.985452",
+        "deleted_reason": ""
     }
 ]

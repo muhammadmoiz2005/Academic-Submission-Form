@@ -7,10 +7,13 @@ import hashlib
 from pathlib import Path
 import secrets
 import string
+import zipfile
+import io
+import shutil
 
 # Page configuration
 st.set_page_config(
-    page_title="Project Allocation System",
+    page_title="Academic Projects, Labs & Assignments Portal",
     page_icon="🎓",
     layout="wide"
 )
@@ -26,11 +29,16 @@ SHORT_URLS_FILE = os.path.join(DATA_DIR, "short_urls.json")
 ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 FILE_SUBMISSION_FILE = os.path.join(DATA_DIR, "file_submission.json")
 FILE_SUBMISSIONS_FILE = os.path.join(DATA_DIR, "file_submissions.json")
+HIDDEN_FIELDS_FILE = os.path.join(DATA_DIR, "hidden_fields.json")
+LAB_MANUAL_FILE = os.path.join(DATA_DIR, "lab_manual.json")
+CLASS_ASSIGNMENTS_FILE = os.path.join(DATA_DIR, "class_assignments.json")
 
 # Create data directories if they don't exist
 Path(DATA_DIR).mkdir(exist_ok=True)
-Path(ARCHIVE_DIR).mkdir(exist_ok=True)
-Path(os.path.join(DATA_DIR, "submitted_files")).mkdir(exist_ok=True)
+Path(ARCHIVE_DIR).mkdir(parents=True, exist_ok=True)
+Path(os.path.join(DATA_DIR, "submitted_files")).mkdir(parents=True, exist_ok=True)
+Path(os.path.join(DATA_DIR, "lab_manual")).mkdir(parents=True, exist_ok=True)
+Path(os.path.join(DATA_DIR, "class_assignments")).mkdir(parents=True, exist_ok=True)
 
 def generate_short_code(length=8):
     """Generate a random short code for URLs"""
@@ -63,11 +71,19 @@ def archive_data(data_type, data, reason=""):
 def init_files():
     """Initialize data files if they don't exist"""
     default_config = {
-        "max_members": 4,
+        "max_members": 3,
         "next_group_number": 1,
         "form_published": True,
         "base_url": "http://localhost:8501",
-        "enable_file_submission": False
+        "enable_file_submission": False,
+        "form_mode": "project_allocation",
+        "allow_allocation_edit": False,
+        "project_file_submission_open": False,
+        "lab_manual_open": False,
+        "lab_file_upload_required": False,
+        "class_assignment_open": False,
+        "course_name": "",
+        "lab_subject_name": ""
     }
     
     # Admin credentials (default: admin/password123)
@@ -80,33 +96,68 @@ def init_files():
     default_form_content = {
         "cover_page": {
             "enabled": True,
-            "title": "🎓 Final Year Project Allocation",
-            "content": """
-# Welcome to Project Allocation System
-
-This form is for final year students to select their project topics and form groups.
-
-## Important Instructions:
-1. Form groups of 1-4 members (as specified by your department)
-2. The first member will be the group leader
-3. Select only ONE project from the available list
-4. Ensure all information is accurate before submission
-
-## Submission Guidelines:
-- Deadline: December 31, 2024
-- Contact: projects@university.edu
-- Queries: Contact project coordinator
-            """,
+            "title": "🎓 COAL Project Allocation",
+            "content": "",
             "background_color": "#ffffff",
-            "text_color": "#000000"
-        },
+            "text_color": "#000000" 
+         },
         "form_header": {
-            "title": "Final Year Project Selection Form",
+            "title": "COAL Project Selection Form",
             "description": "Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory.",
             "show_deadline": True,
             "deadline": "2024-12-31",
             "show_contact": True,
-            "contact_email": "projects@university.edu"
+            "contact_email": "coal@university.edu"
+        },
+        "instructions": {
+            "enabled": True,
+            "title": "ℹ️ Instructions & Guidelines",
+            "content": """# Instructions & Guidelines
+
+## Submission Process
+
+### Step-by-Step Guide
+
+1. **Form Your Group**
+   - Minimum 1 member required (Group Leader)
+   - Maximum members as set by admin
+   - First member is Group Leader
+   - All members should have unique roll numbers
+
+2. **Select a Project**
+   - Only unselected projects are shown
+   - Each project can be selected only once
+   - Choose carefully - selection is final
+
+3. **Submit Application**
+   - Fill all required fields
+   - Confirm accuracy of information
+   - Submit before deadline
+
+## Important Rules
+
+⚠️ **Project Selection Rules:**
+- Each project can be selected by only ONE group
+- Once selected, project disappears from available list
+- No duplicate roll numbers across groups
+
+⚠️ **Group Formation Rules:**
+- Group Leader is mandatory
+- Minimum 1 member required
+- Roll numbers must be unique within group
+- Cannot edit after submission
+
+⚠️ **After Submission:**
+- Save your Group Number
+- Check allocation table for updates
+- Contact admin for any changes""",
+             "additional_notes": "For any queries or issues, please contact the Class Representative.",
+            "visibility": {
+                "project_allocation": True,
+                "project_file_submission": True,
+                "lab_manual": False,
+                "class_assignment": False
+            }
         }
     }
     
@@ -126,7 +177,10 @@ This form is for final year students to select their project topics and form gro
         (FORM_CONTENT_FILE, default_form_content),
         (SHORT_URLS_FILE, {}),
         (FILE_SUBMISSION_FILE, default_file_submission),
-        (FILE_SUBMISSIONS_FILE, {})
+        (FILE_SUBMISSIONS_FILE, {}),
+        (HIDDEN_FIELDS_FILE, []),
+        (LAB_MANUAL_FILE, []),
+        (CLASS_ASSIGNMENTS_FILE, [])
     ]
     
     for file_path, default_data in files_to_init:
@@ -187,18 +241,31 @@ def display_cover_page(form_content):
     if not cover.get("enabled", True):
         return
     
-    st.markdown(f'<div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">{cover.get("title", "🎓 Project Allocation")}</div>', unsafe_allow_html=True)
-    st.markdown(cover.get("content", ""))
+    # Apply custom styles
+    st.markdown(f"""
+    <div style="
+        background-color: {cover.get('background_color', '#ffffff')};
+        color: {cover.get('text_color', '#000000')};
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    ">
+        <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">
+            {cover.get('title', '🎓 COAL Project Allocation')}
+        </div>
+        {cover.get('content', '')}
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
 
 def display_form_header(form_content):
     """Display the form header/title section"""
     header = form_content.get("form_header", {})
     
-    st.title(header.get("title", "Final Year Project Selection Form"))
+    st.title(header.get("title", "COAL Project Selection Form"))
     
     # Description
-    st.markdown(f"**Description:** {header.get('description', '')}")
+    st.markdown(f"**Description:** {header.get('description', 'Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory.')}")
     
     # Additional info if enabled
     if header.get("show_deadline", True):
@@ -206,15 +273,270 @@ def display_form_header(form_content):
         st.info(f"⏰ **Submission Deadline:** {deadline}")
     
     if header.get("show_contact", True):
-        contact_email = header.get("contact_email", "projects@university.edu")
+        contact_email = header.get("contact_email", "coal@university.edu")
         st.info(f"📧 **Contact for Queries:** {contact_email}")
     
     st.markdown("---")
 
+def class_assignment_submission_form():
+    """Form for class assignment submission"""
+    st.header("📘 Class Assignment Submission")
+    
+    # Load course name from config
+    config = load_data(CONFIG_FILE) or {}
+    course_name = config.get("course_name", "")
+    
+    if course_name:
+        st.info(f"**Course:** {course_name}")
+    
+    with st.form("class_assignment_form", clear_on_submit=True):
+        # Student information
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Full Name*", placeholder="Enter your full name")
+        with col2:
+            roll_no = st.text_input("Roll Number*", placeholder="Enter your roll number")
+        
+        # File upload
+        st.subheader("📎 Upload Assignment File")
+        
+        allowed_formats = [".pdf", ".doc", ".docx", ".txt", ".zip", ".rar", ".py", ".java", ".cpp", ".c"]
+        file_types = [fmt[1:] if fmt.startswith('.') else fmt for fmt in allowed_formats]
+        
+        uploaded_file = st.file_uploader(
+            "Upload your assignment file*",
+            type=file_types,
+            help=f"Allowed formats: {', '.join(allowed_formats)}"
+        )
+        
+        # Assignment details
+        assignment_no = st.number_input("Assignment Number", min_value=1, value=1)
+        remarks = st.text_area("Remarks (optional)", placeholder="Any additional remarks about your submission...")
+        
+        # Terms agreement
+        agree = st.checkbox("I confirm that this is my own work*")
+        
+        submitted = st.form_submit_button("📤 Submit Assignment", use_container_width=True)
+        
+        if submitted:
+            errors = []
+            if not name.strip():
+                errors.append("❌ Name is required")
+            if not roll_no.strip():
+                errors.append("❌ Roll number is required")
+            if not uploaded_file:
+                errors.append("❌ File upload is required")
+            if not agree:
+                errors.append("❌ Please confirm this is your own work")
+            
+            if errors:
+                for error in errors:
+                    st.error(error)
+            else:
+                # Load existing submissions
+                class_submissions = load_data(CLASS_ASSIGNMENTS_FILE) or []
+                
+                # Check if this roll number already submitted this assignment
+                existing = next((s for s in class_submissions if s.get('roll_no') == roll_no.strip() and s.get('assignment_no') == assignment_no), None)
+                if existing:
+                    st.error("❌ This roll number has already submitted this assignment")
+                else:
+                    # Create submission record
+                    submission_record = {
+                        "name": name.strip(),
+                        "roll_no": roll_no.strip(),
+                        "course_name": course_name,
+                        "assignment_no": assignment_no,
+                        "remarks": remarks.strip() if remarks.strip() else "",
+                        "submission_date": datetime.now().isoformat(),
+                        "status": "Submitted"
+                    }
+                    
+                    # Save uploaded file
+                    if uploaded_file:
+                        # Create directory for class assignments
+                        class_dir = os.path.join(DATA_DIR, "class_assignments")
+                        Path(class_dir).mkdir(parents=True, exist_ok=True)
+                        
+                        # Generate unique filename
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        filename = f"{timestamp}_{roll_no.strip()}_{assignment_no}_{uploaded_file.name}"
+                        file_path = os.path.join(class_dir, filename)
+                        
+                        # Save file
+                        with open(file_path, 'wb') as f:
+                            f.write(uploaded_file.getbuffer())
+                        
+                        submission_record["filename"] = filename
+                        submission_record["original_filename"] = uploaded_file.name
+                        submission_record["file_size"] = uploaded_file.size
+                        submission_record["file_type"] = uploaded_file.type
+                    
+                    # Save to database
+                    class_submissions.append(submission_record)
+                    save_data(class_submissions, CLASS_ASSIGNMENTS_FILE)
+                    
+                    st.success("✅ Assignment submitted successfully!")
+                    st.balloons()
+                    
+                    # Show confirmation
+                    st.markdown("---")
+                    st.markdown(f"""
+                    ## ✅ Submission Complete!
+                    
+                    **Name:** {name}
+                    **Roll Number:** {roll_no}
+                    **Course:** {course_name}
+                    **Assignment No:** {assignment_no}
+                    **Submission Time:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
+                    
+                    Your assignment has been submitted successfully.
+                    """)
+
+def lab_manual_submission_form():
+    """Form for lab manual submission"""
+    st.header("📚 Lab Manual Submission")
+    
+    # Load subject name from config
+    config = load_data(CONFIG_FILE) or {}
+    lab_subject_name = config.get("lab_subject_name", "")
+    
+    if lab_subject_name:
+        st.info(f"**Subject:** {lab_subject_name}")
+    
+    with st.form("lab_manual_form", clear_on_submit=True):
+        # Simple fields only
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Full Name*", placeholder="Enter your full name")
+        with col2:
+            roll_no = st.text_input("Roll Number*", placeholder="Enter your roll number")
+        
+        # File upload
+        st.subheader("📎 Upload File")
+        
+        # Load lab settings from config
+        lab_file_required = config.get("lab_file_upload_required", False)
+        
+        allowed_formats = [".pdf", ".doc", ".docx", ".txt", ".zip", ".rar"]
+        file_types = [fmt[1:] if fmt.startswith('.') else fmt for fmt in allowed_formats]
+        
+        uploaded_file = st.file_uploader(
+            f"Upload your file{'*' if lab_file_required else ''}",
+            type=file_types,
+            help=f"Allowed formats: {', '.join(allowed_formats)}"
+        )
+        
+        # Terms agreement
+        agree = st.checkbox("I confirm that this is my own work*")
+        
+        submitted = st.form_submit_button("📤 Submit Lab Manual", use_container_width=True)
+        
+        if submitted:
+            errors = []
+            if not name.strip():
+                errors.append("❌ Name is required")
+            if not roll_no.strip():
+                errors.append("❌ Roll number is required")
+            if lab_file_required and not uploaded_file:
+                errors.append("❌ File upload is required")
+            if not agree:
+                errors.append("❌ Please confirm this is your own work")
+            
+            if errors:
+                for error in errors:
+                    st.error(error)
+            else:
+                # Load existing submissions
+                lab_manual = load_data(LAB_MANUAL_FILE) or []
+                
+                # Check if roll number already submitted
+                existing = next((s for s in lab_manual if s.get('roll_no') == roll_no.strip()), None)
+                if existing:
+                    st.error("❌ This roll number has already submitted a lab manual")
+                else:
+                    # Create submission record
+                    submission_record = {
+                        "name": name.strip(),
+                        "roll_no": roll_no.strip(),
+                        "subject_name": lab_subject_name,
+                        "submission_date": datetime.now().isoformat(),
+                        "status": "Submitted"
+                    }
+                    
+                    # Save uploaded file
+                    if uploaded_file:
+                        # Create directory for lab manual
+                        lab_dir = os.path.join(DATA_DIR, "lab_manual")
+                        Path(lab_dir).mkdir(parents=True, exist_ok=True)
+                        
+                        # Generate unique filename
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        filename = f"{timestamp}_{roll_no.strip()}_{uploaded_file.name}"
+                        file_path = os.path.join(lab_dir, filename)
+                        
+                        # Save file
+                        with open(file_path, 'wb') as f:
+                            f.write(uploaded_file.getbuffer())
+                        
+                        submission_record["filename"] = filename
+                        submission_record["original_filename"] = uploaded_file.name
+                        submission_record["file_size"] = uploaded_file.size
+                    
+                    # Save to database
+                    lab_manual.append(submission_record)
+                    save_data(lab_manual, LAB_MANUAL_FILE)
+                    
+                    st.success("✅ Lab manual submitted successfully!")
+                    st.balloons()
+                    
+                    # Show confirmation
+                    st.markdown("---")
+                    st.markdown(f"""
+                    ## ✅ Submission Complete!
+                    
+                    **Name:** {name}
+                    **Roll Number:** {roll_no}
+                    **Subject:** {lab_subject_name}
+                    **Submission Time:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
+                    
+                    Your lab manual has been submitted successfully.
+                    """)
+
+def display_instructions(form_content):
+    """Display instructions tab based on current mode"""
+    config = load_data(CONFIG_FILE) or {}
+    current_mode = config.get("form_mode", "project_allocation")
+    
+    instructions = form_content.get("instructions", {})
+    
+    # Check if instructions are enabled for current mode
+    visibility = instructions.get("visibility", {})
+    if not visibility.get(current_mode, True):
+        return
+    
+    if not instructions.get("enabled", True):
+        return
+    
+    st.header(instructions.get("title", "ℹ️ Instructions & Guidelines"))
+    
+    # Display main instructions content
+    st.markdown(instructions.get("content", ""))
+    
+    # Display additional notes if any
+    if instructions.get("additional_notes"):
+        st.markdown("---")
+        st.markdown("### Additional Information")
+        st.markdown(instructions.get("additional_notes"))
+    
+    # Display contact information
+    st.markdown("---")
+    st.subheader("Need Help?")
+    st.info("For any queries or issues, please contact the Class Representative.")
+
 def student_form_standalone():
     """Student form without Admin Dashboard option in sidebar"""
-    # Load form content
-    form_content = load_data(FORM_CONTENT_FILE) or {}
+    # Load config
     config = load_data(CONFIG_FILE) or {}
     
     # Check if form is published
@@ -222,104 +544,166 @@ def student_form_standalone():
         st.warning("⏸️ The form is currently under maintenance. Please check back later.")
         return
     
-    # Check if file submission is enabled
-    file_submission_enabled = config.get("enable_file_submission", False)
+    # Determine which mode is active
+    form_mode = config.get("form_mode", "project_allocation")
     
-    if file_submission_enabled:
-        # File submission tabs
-        tab1, tab2, tab3 = st.tabs(["📄 File Submission", "📊 View Allocations", "ℹ️ Instructions"])
-        with tab1:
-            display_file_submission_form(form_content, config)
-        with tab2:
-            display_allocations_table_for_students()
-        with tab3:
-            display_instructions(form_content)
-    else:
-        # Regular form tabs
-        tab1, tab2, tab3 = st.tabs(["📋 Submit Form", "📊 View Allocations", "ℹ️ Instructions"])
-        with tab1:
-            display_submission_form(form_content, config)
-        with tab2:
-            display_allocations_table_for_students()
-        with tab3:
-            display_instructions(form_content)
+    if form_mode == "project_allocation":
+        # MODE A: Project Allocation Mode
+        form_content = load_data(FORM_CONTENT_FILE) or {}
+        
+        # Check if allocation editing is allowed
+        allow_edit = config.get("allow_allocation_edit", False)
+        
+        if allow_edit:
+            # Show tabs with edit option
+            tab1, tab2, tab3 = st.tabs(["📋 Project Selection Form", "📊 View Allocations", "ℹ️ Instructions"])
+            with tab1:
+                display_submission_form(form_content, config)
+            with tab2:
+                display_allocations_table_for_students()
+            with tab3:
+                display_instructions(form_content)
+        else:
+            # View only mode
+            tab1, tab2 = st.tabs(["📊 View Allocations", "ℹ️ Instructions"])
+            with tab1:
+                display_allocations_table_for_students()
+            with tab2:
+                display_instructions(form_content)
+    
+    elif form_mode == "project_file_submission":
+        # MODE B: Project File Submission Mode
+        form_content = load_data(FORM_CONTENT_FILE) or {}
+        
+        # Check if submission is open
+        submission_open = config.get("project_file_submission_open", False)
+        
+        if submission_open:
+            # Show file submission form
+            tab1, tab2, tab3 = st.tabs(["📁 Submit Files", "📊 View Allocations", "ℹ️ Instructions"])
+            with tab1:
+                display_project_file_submission_form(form_content, config)
+            with tab2:
+                display_allocations_table_for_students()
+            with tab3:
+                display_instructions(form_content)
+        else:
+            # Show message that submission is closed
+            st.info("📁 Project file submission is currently closed.")
+            tab1, tab2 = st.tabs(["📊 View Allocations", "ℹ️ Instructions"])
+            with tab1:
+                display_allocations_table_for_students()
+            with tab2:
+                display_instructions(form_content)
+    
+    elif form_mode == "lab_manual":
+        # MODE C: Lab Manual Submission Mode
+        lab_manual_submission_form()
+    
+    elif form_mode == "class_assignment":
+        # MODE D: Class Assignment Submission Mode
+        class_assignment_submission_form()
 
-def display_file_submission_form(form_content, config):
-    """Display file submission form (simplified version)"""
-    # Display cover page if enabled
-    display_cover_page(form_content)
+def display_project_file_submission_form(form_content, config):
+    """Display project file submission form with submission status"""
+    st.header("📁 Project File Submission")
     
-    # Display form header
-    display_form_header(form_content)
-    
-    # Load file submission settings
-    file_settings = load_data(FILE_SUBMISSION_FILE) or {}
-    
-    st.header("📁 File Submission")
-    st.info("⚠️ You can only submit files if you have already submitted your project allocation.")
-    
-    with st.form("file_submission_form"):
-        # Group number input
+    with st.form("project_file_submission_form", clear_on_submit=False):
+        # Group number input - use a clean numeric input without session state conflicts
         group_number = st.number_input(
             "Enter Your Group Number*",
             min_value=1,
             step=1,
-            help="Enter the group number you received after submission"
+            value=1,
+            help="Enter the group number you received after project allocation",
+            key="project_file_group_number"
         )
         
-        # Verify group exists
-        groups = load_data(GROUPS_FILE) or []
-        group_exists = any(g['group_number'] == group_number and not g.get('deleted', False) for g in groups)
+        # Submit button for group number verification
+        group_number_submitted = st.form_submit_button("🔍 Verify Group Number", use_container_width=True)
         
-        if group_exists:
-            # Get group details
-            group = next((g for g in groups if g['group_number'] == group_number), None)
-            if group:
-                project_name = group.get('project_name', 'N/A')
-                leader_name = ""
-                for member in group.get('members', []):
-                    if member.get('is_leader'):
-                        leader_name = member.get('name', '')
-                        break
+        if group_number_submitted:
+            # Verify group exists
+            groups = load_data(GROUPS_FILE) or []
+            group_exists = any(g['group_number'] == group_number and not g.get('deleted', False) for g in groups)
+            
+            if not group_exists:
+                st.error("❌ Group number not found. Please check your group number.")
+                st.info("You must have submitted a project allocation first.")
+                st.session_state.group_verified = False
+            else:
+                st.session_state.group_verified = True
+                st.session_state.verified_group_number = group_number
                 
-                # Show group details
-                st.success(f"✅ Group {group_number} verified!")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.info(f"**Group Leader:** {leader_name}")
-                with col2:
-                    st.info(f"**Project:** {project_name}")
-                
-                # File upload
-                st.subheader("📎 Upload Files")
-                allowed_formats = file_settings.get("allowed_formats", [".pdf", ".doc", ".docx"])
-                max_size = file_settings.get("max_size_mb", 10) * 1024 * 1024
-                
-                # Convert formats for file_uploader
-                file_types = []
-                for fmt in allowed_formats:
-                    if fmt.startswith('.'):
-                        file_types.append(fmt[1:])  # Remove dot
+                # Get group details
+                group = next((g for g in groups if g['group_number'] == group_number), None)
+                if group:
+                    project_name = group.get('project_name', 'N/A')
+                    leader_name = ""
+                    for member in group.get('members', []):
+                        if member.get('is_leader'):
+                            leader_name = member.get('name', '')
+                            break
+                    
+                    # Show group details
+                    st.success(f"✅ Group {group_number} verified!")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"**Group Leader:** {leader_name}")
+                    with col2:
+                        st.info(f"**Project:** {project_name}")
+                    
+                    # Check submission status (only status, not file names)
+                    file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
+                    group_files = file_submissions.get(str(group_number), [])
+                    
+                    # Display submission status only (no file names)
+                    st.markdown("---")
+                    st.subheader("📋 Submission Status")
+                    
+                    if group_files:
+                        status_icon = "✅"
+                        status_text = "Submitted"
+                        st.success(f"{status_icon} **Status:** {status_text}")
+                        st.info(f"✅ You have submitted {len(group_files)} file(s) for your project.")
                     else:
-                        file_types.append(fmt)
-                
-                uploaded_files = st.file_uploader(
-                    "Upload your project files",
-                    type=file_types,
-                    accept_multiple_files=True,
-                    help=f"Allowed formats: {', '.join(allowed_formats)} | Max size: {file_settings.get('max_size_mb', 10)}MB per file"
-                )
-                
-                # Instructions
-                st.info(file_settings.get("instructions", "Please upload your project files."))
-                
-                # Submit button
-                submitted = st.form_submit_button("📤 Submit Files", use_container_width=True)
-                
-                if submitted:
-                    if uploaded_files:
-                        # Save file information
-                        file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
+                        status_icon = "❌"
+                        status_text = "Not Submitted"
+                        st.error(f"{status_icon} **Status:** {status_text}")
+                        st.info("Please submit your project files below.")
+                    
+                    # File upload section (only shown after verification)
+                    st.markdown("---")
+                    st.subheader("📎 Upload Files")
+                    
+                    # Load file submission settings
+                    file_settings = load_data(FILE_SUBMISSION_FILE) or {}
+                    allowed_formats = file_settings.get("allowed_formats", [".pdf", ".doc", ".docx"])
+                    max_size = file_settings.get("max_size_mb", 10) * 1024 * 1024
+                    
+                    # Convert formats for file_uploader
+                    file_types = []
+                    for fmt in allowed_formats:
+                        if fmt.startswith('.'):
+                            file_types.append(fmt[1:])  # Remove dot
+                        else:
+                            file_types.append(fmt)
+                    
+                    uploaded_files = st.file_uploader(
+                        "Upload your project files*",
+                        type=file_types,
+                        accept_multiple_files=True,
+                        help=f"Allowed formats: {', '.join(allowed_formats)} | Max size: {file_settings.get('max_size_mb', 10)}MB per file",
+                        key="project_file_uploader"
+                    )
+                    
+                    # Instructions
+                    st.info(file_settings.get("instructions", "Please upload your project files in the specified formats."))
+                    
+                    # Submit files button
+                    files_submitted = st.form_submit_button("📤 Submit Files", use_container_width=True, key="submit_project_files")
+                    
+                    if files_submitted and uploaded_files:
                         if str(group_number) not in file_submissions:
                             file_submissions[str(group_number)] = []
                         
@@ -347,11 +731,113 @@ def display_file_submission_form(form_content, config):
                         save_data(file_submissions, FILE_SUBMISSIONS_FILE)
                         st.success("✅ Files submitted successfully!")
                         st.balloons()
-                    else:
+                        st.rerun()
+                    elif files_submitted and not uploaded_files:
                         st.error("❌ Please select at least one file to upload")
-        else:
-            st.error("❌ Group number not found. Please check your group number.")
-            st.info("You must first submit your project allocation before uploading files.")
+        
+        # Handle case where group was already verified
+        elif st.session_state.get('group_verified', False) and st.session_state.get('verified_group_number'):
+            group_number = st.session_state.verified_group_number
+            groups = load_data(GROUPS_FILE) or []
+            group = next((g for g in groups if g['group_number'] == group_number), None)
+            
+            if group:
+                project_name = group.get('project_name', 'N/A')
+                leader_name = ""
+                for member in group.get('members', []):
+                    if member.get('is_leader'):
+                        leader_name = member.get('name', '')
+                        break
+                
+                # Show group details
+                st.success(f"✅ Group {group_number} verified!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"**Group Leader:** {leader_name}")
+                with col2:
+                    st.info(f"**Project:** {project_name}")
+                
+                # Check submission status
+                file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
+                group_files = file_submissions.get(str(group_number), [])
+                
+                # Display submission status
+                st.markdown("---")
+                st.subheader("📋 Submission Status")
+                
+                if group_files:
+                    status_icon = "✅"
+                    status_text = "Submitted"
+                    st.success(f"{status_icon} **Status:** {status_text}")
+                    st.info(f"✅ You have submitted {len(group_files)} file(s) for your project.")
+                else:
+                    status_icon = "❌"
+                    status_text = "Not Submitted"
+                    st.error(f"{status_icon} **Status:** {status_text}")
+                    st.info("Please submit your project files below.")
+                
+                # File upload section
+                st.markdown("---")
+                st.subheader("📎 Upload Files")
+                
+                # Load file submission settings
+                file_settings = load_data(FILE_SUBMISSION_FILE) or {}
+                allowed_formats = file_settings.get("allowed_formats", [".pdf", ".doc", ".docx"])
+                max_size = file_settings.get("max_size_mb", 10) * 1024 * 1024
+                
+                # Convert formats for file_uploader
+                file_types = []
+                for fmt in allowed_formats:
+                    if fmt.startswith('.'):
+                        file_types.append(fmt[1:])
+                    else:
+                        file_types.append(fmt)
+                
+                uploaded_files = st.file_uploader(
+                    "Upload your project files*",
+                    type=file_types,
+                    accept_multiple_files=True,
+                    help=f"Allowed formats: {', '.join(allowed_formats)} | Max size: {file_settings.get('max_size_mb', 10)}MB per file",
+                    key="project_file_uploader_verified"
+                )
+                
+                # Instructions
+                st.info(file_settings.get("instructions", "Please upload your project files in the specified formats."))
+                
+                # Submit files button
+                files_submitted = st.form_submit_button("📤 Submit Files", use_container_width=True, key="submit_project_files_verified")
+                
+                if files_submitted and uploaded_files:
+                    if str(group_number) not in file_submissions:
+                        file_submissions[str(group_number)] = []
+                    
+                    for uploaded_file in uploaded_files:
+                        file_info = {
+                            "filename": uploaded_file.name,
+                            "size": uploaded_file.size,
+                            "uploaded_at": datetime.now().isoformat(),
+                            "project_name": project_name,
+                            "group_leader": leader_name
+                        }
+                        file_submissions[str(group_number)].append(file_info)
+                        
+                        # Save file to disk
+                        file_dir = os.path.join(DATA_DIR, "submitted_files", str(group_number))
+                        Path(file_dir).mkdir(parents=True, exist_ok=True)
+                        file_path = os.path.join(file_dir, uploaded_file.name)
+                        try:
+                            with open(file_path, 'wb') as f:
+                                f.write(uploaded_file.getbuffer())
+                        except Exception as e:
+                            st.error(f"Error saving file {uploaded_file.name}: {e}")
+                            continue
+                    
+                    save_data(file_submissions, FILE_SUBMISSIONS_FILE)
+                    st.success("✅ Files submitted successfully!")
+                    st.balloons()
+                    st.rerun()
+                elif files_submitted and not uploaded_files:
+                    st.error("❌ Please select at least one file to upload")
 
 def display_allocations_table_for_students():
     """Display allocations table for students with project count"""
@@ -439,59 +925,6 @@ def display_allocations_table_for_students():
     else:
         st.info("⚠️ No projects available for selection at the moment.")
 
-def display_instructions(form_content):
-    """Display instructions tab"""
-    st.header("ℹ️ Instructions & Guidelines")
-    
-    cover = form_content.get("cover_page", {})
-    if cover.get("enabled", True):
-        st.markdown(cover.get("content", ""))
-    
-    st.markdown("---")
-    
-    st.subheader("📋 Submission Process")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        ### Step-by-Step Guide
-        
-        1. **Form Your Group**
-           - Minimum 1 member required (Group Leader)
-           - First member is Group Leader
-           - All members should have unique roll numbers
-        
-        2. **Select a Project**
-           - Only unselected projects are shown
-           - Each project can be selected only once
-           - Choose carefully - selection is final
-        
-        3. **Submit Application**
-           - Fill all required fields
-           - Confirm accuracy of information
-           - Submit before deadline
-        """)
-    
-    with col2:
-        st.markdown("""
-        ### Important Rules
-        
-        ⚠️ **Project Selection Rules:**
-        - Each project can be selected by only ONE group
-        - Once selected, project disappears from available list
-        - No duplicate roll numbers across groups
-        
-        ⚠️ **Group Formation Rules:**
-        - Group Leader is mandatory
-        - Roll numbers must be unique within group
-        - Cannot edit after submission
-        
-        ⚠️ **After Submission:**
-        - Save your Group Number
-        - Check allocation table for updates
-        - Contact admin for any changes
-        """)
-
 def display_submission_form(form_content, config):
     """Display the submission form"""
     # Display cover page if enabled
@@ -501,7 +934,7 @@ def display_submission_form(form_content, config):
     display_form_header(form_content)
     
     # Load configuration
-    max_members = config.get("max_members", 4)
+    max_members = config.get("max_members", 3)
     
     # Load projects
     projects = load_data(PROJECTS_FILE) or []
@@ -536,10 +969,10 @@ def display_submission_form(form_content, config):
             "is_leader": True
         })
         
-        # Additional members
+        # Additional members (up to max_members-1 more)
         if max_members > 1:
-            st.markdown("### 👥 Additional Members")
-            st.caption(f"Fill details for members 2 to {max_members} (optional)")
+            st.markdown("### 👥 Additional Members (Optional)")
+            st.caption(f"You can add up to {max_members - 1} additional members (maximum {max_members} total)")
             
             for i in range(2, max_members + 1):
                 st.markdown(f"**Member {i}**")
@@ -727,7 +1160,7 @@ def display_submission_form(form_content, config):
                 
                 # Thank you page
                 st.markdown("---")
-                st.header("🎉 Thank You! 🙏")
+                st.header("🎉 Thank You!")
                 
                 col1, col2 = st.columns(2)
                 
@@ -757,13 +1190,677 @@ def display_submission_form(form_content, config):
                 st.markdown("---")
                 st.info("📱 You may close this window now. Your submission has been recorded.")
 
+def manage_file_submissions():
+    """Admin panel to manage and download submitted files"""
+    st.header("📁 Project File Submissions")
+    
+    # Load file submissions data
+    file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
+    
+    if not file_submissions:
+        st.info("No project files have been submitted yet.")
+        return
+    
+    # Display all groups with submitted files
+    st.subheader("📋 Submission Status Report")
+    
+    # Get all groups
+    groups = load_data(GROUPS_FILE) or []
+    active_groups = [g for g in groups if not g.get('deleted', False)]
+    
+    # Create submission status report
+    status_data = []
+    for group in active_groups:
+        group_num = group['group_number']
+        group_files = file_submissions.get(str(group_num), [])
+        
+        # Get group leader
+        leader_name = ""
+        for member in group['members']:
+            if member.get('is_leader'):
+                leader_name = member['name']
+                break
+        
+        status_data.append({
+            "Group #": group_num,
+            "Project": group['project_name'],
+            "Group Leader": leader_name,
+            "Files Submitted": len(group_files),
+            "Status": "✅ Submitted" if len(group_files) > 0 else "❌ Not Submitted",
+            "Last Submission": max([f['uploaded_at'] for f in group_files], default="Not submitted")
+        })
+    
+    # Sort by group number
+    status_data.sort(key=lambda x: x['Group #'])
+    
+    # Create DataFrame
+    df_status = pd.DataFrame(status_data)
+    
+    # Display status table
+    st.dataframe(
+        df_status,
+        use_container_width=True,
+        column_config={
+            "Group #": st.column_config.NumberColumn(width="small"),
+            "Project": st.column_config.TextColumn(width="medium"),
+            "Group Leader": st.column_config.TextColumn(width="medium"),
+            "Files Submitted": st.column_config.NumberColumn(width="small"),
+            "Status": st.column_config.TextColumn(width="medium"),
+            "Last Submission": st.column_config.DatetimeColumn(width="medium")
+        }
+    )
+    
+    # Show statistics
+    st.subheader("📊 Submission Statistics")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_groups = len(active_groups)
+        st.metric("Total Groups", total_groups)
+    
+    with col2:
+        submitted_groups = len([g for g in status_data if g['Files Submitted'] > 0])
+        st.metric("Submitted Groups", submitted_groups)
+    
+    with col3:
+        not_submitted = total_groups - submitted_groups
+        st.metric("Not Submitted", not_submitted)
+    
+    with col4:
+        submission_rate = (submitted_groups / total_groups * 100) if total_groups > 0 else 0
+        st.metric("Submission Rate", f"{submission_rate:.1f}%")
+    
+    # Show groups without submission
+    not_submitted_groups = [g for g in status_data if g['Files Submitted'] == 0]
+    if not_submitted_groups:
+        st.subheader("📝 Groups Without Submission")
+        for group in not_submitted_groups:
+            st.write(f"• **Group {group['Group #']}**: {group['Project']} (Leader: {group['Group Leader']})")
+    
+    # Download functionality
+    st.markdown("---")
+    st.subheader("📥 Download Submitted Files")
+    
+    # Display groups with files
+    st.write("**Groups with submitted files:**")
+    groups_with_files = [g for g in status_data if g['Files Submitted'] > 0]
+    
+    if not groups_with_files:
+        st.info("No files available for download.")
+    else:
+        # Create tabs for download options
+        tab1, tab2 = st.tabs(["📦 Download All Files", "📁 Download by Group"])
+        
+        with tab1:
+            # Download all files button
+            if st.button("⬇️ Download All Project Files as ZIP", use_container_width=True):
+                # Check if there are any files
+                has_files = False
+                for group_num in file_submissions.keys():
+                    group_dir = os.path.join(DATA_DIR, "submitted_files", group_num)
+                    if os.path.exists(group_dir) and os.listdir(group_dir):
+                        has_files = True
+                        break
+                
+                if not has_files:
+                    st.warning("No files available for download.")
+                else:
+                    # Create zip of all files
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        for group_num in file_submissions.keys():
+                            group_dir = os.path.join(DATA_DIR, "submitted_files", group_num)
+                            if os.path.exists(group_dir):
+                                for root, dirs, filenames in os.walk(group_dir):
+                                    for filename in filenames:
+                                        file_path = os.path.join(root, filename)
+                                        arcname = os.path.join(f"Group_{group_num}", filename)
+                                        zip_file.write(file_path, arcname)
+                    
+                    zip_buffer.seek(0)
+                    
+                    # Provide download
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="📥 Download All Project Files",
+                        data=zip_buffer,
+                        file_name=f"all_project_files_{timestamp}.zip",
+                        mime="application/zip"
+                    )
+        
+        with tab2:
+            # Download by group
+            group_options = [f"Group {g['Group #']}" for g in groups_with_files]
+            selected_group = st.selectbox("Select Group", options=[""] + group_options)
+            
+            if selected_group:
+                group_num = selected_group.replace("Group ", "")
+                group_dir = os.path.join(DATA_DIR, "submitted_files", group_num)
+                
+                if os.path.exists(group_dir) and os.listdir(group_dir):
+                    # Create zip file for the group
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        for root, dirs, filenames in os.walk(group_dir):
+                            for filename in filenames:
+                                file_path = os.path.join(root, filename)
+                                arcname = filename
+                                zip_file.write(file_path, arcname)
+                    
+                    zip_buffer.seek(0)
+                    
+                    # Provide download
+                    st.download_button(
+                        label=f"📥 Download {selected_group} Files",
+                        data=zip_buffer,
+                        file_name=f"{selected_group}_files.zip",
+                        mime="application/zip"
+                    )
+                else:
+                    st.info("No files found for this group.")
+    
+    # Delete functionality
+    st.markdown("---")
+    st.subheader("🗑️ Delete Files")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        group_to_delete = st.selectbox(
+            "Select group to delete files",
+            options=[""] + [str(g['Group #']) for g in groups_with_files]
+        )
+    
+    with col2:
+        if group_to_delete and st.button("🗑️ Delete Group Files", type="secondary"):
+            # Archive file submission data
+            if group_to_delete in file_submissions:
+                archive_data("file_submissions", {group_to_delete: file_submissions[group_to_delete]}, "Admin deleted group files")
+                
+                # Remove from file submissions data
+                del file_submissions[group_to_delete]
+                save_data(file_submissions, FILE_SUBMISSIONS_FILE)
+                
+                # Delete files from disk
+                group_dir = os.path.join(DATA_DIR, "submitted_files", group_to_delete)
+                if os.path.exists(group_dir):
+                    try:
+                        shutil.rmtree(group_dir)
+                    except Exception as e:
+                        st.error(f"Error deleting files: {e}")
+                
+                st.success(f"✅ Files for Group {group_to_delete} deleted successfully!")
+                st.rerun()
+
+def manage_lab_manual():
+    """Admin panel to manage lab manual submissions"""
+    st.header("📚 Lab Manual Submissions")
+    
+    # Load config for subject name
+    config = load_data(CONFIG_FILE) or {}
+    
+    # Subject name configuration
+    st.subheader("Subject Configuration")
+    lab_subject_name = st.text_input("Lab Subject Name", value=config.get('lab_subject_name', ''))
+    
+    if st.button("💾 Save Subject Name"):
+        config['lab_subject_name'] = lab_subject_name
+        if save_data(config, CONFIG_FILE):
+            st.success("Subject name saved!")
+    
+    if lab_subject_name:
+        st.info(f"**Current Subject:** {lab_subject_name}")
+    
+    # Load lab manual submissions
+    lab_manual = load_data(LAB_MANUAL_FILE) or []
+    
+    if not lab_manual:
+        st.info("No lab manuals submitted yet.")
+        return
+    
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs(["📋 View Submissions", "📥 Download Files", "🗑️ Delete Submissions"])
+    
+    with tab1:
+        # Display all submissions
+        if lab_manual:
+            # Convert to DataFrame for better display
+            df_data = []
+            for submission in lab_manual:
+                df_data.append({
+                    "Name": submission.get('name', ''),
+                    "Roll No": submission.get('roll_no', ''),
+                    "Subject": submission.get('subject_name', ''),
+                    "Status": submission.get('status', 'Submitted'),
+                    "File": submission.get('original_filename', 'No file'),
+                    "File Size": f"{submission.get('file_size', 0) / 1024:.1f} KB" if submission.get('file_size') else "N/A",
+                    "Submitted": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M')
+                })
+            
+            df = pd.DataFrame(df_data)
+            st.dataframe(df, use_container_width=True)
+            
+            # Statistics
+            st.subheader("📊 Statistics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Submissions", len(lab_manual))
+            with col2:
+                with_files = len([s for s in lab_manual if s.get('filename')])
+                st.metric("With Files", with_files)
+            with col3:
+                without_files = len([s for s in lab_manual if not s.get('filename')])
+                st.metric("Without Files", without_files)
+    
+    with tab2:
+        # Download functionality
+        st.subheader("Download All Lab Manuals")
+        
+        # Check if there are files to download
+        submissions_with_files = [s for s in lab_manual if s.get('filename')]
+        
+        if not submissions_with_files:
+            st.warning("No files to download.")
+        else:
+            if st.button("📦 Download All Lab Manuals as ZIP", use_container_width=True):
+                # Create zip of all files
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    lab_dir = os.path.join(DATA_DIR, "lab_manual")
+                    if os.path.exists(lab_dir):
+                        for submission in submissions_with_files:
+                            filename = submission.get('filename')
+                            if filename:
+                                file_path = os.path.join(lab_dir, filename)
+                                if os.path.exists(file_path):
+                                    # Create a descriptive name for the file
+                                    new_filename = f"{submission['roll_no']}_{submission['name']}_{submission.get('original_filename', filename)}"
+                                    zip_file.write(file_path, new_filename)
+                
+                zip_buffer.seek(0)
+                
+                # Provide download
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.download_button(
+                    label="⬇️ Download All Lab Manuals",
+                    data=zip_buffer,
+                    file_name=f"lab_manuals_{timestamp}.zip",
+                    mime="application/zip"
+                )
+    
+    with tab3:
+        # Delete functionality
+        st.subheader("🗑️ Delete Submissions")
+        
+        roll_numbers = [s['roll_no'] for s in lab_manual]
+        selected_roll = st.selectbox(
+            "Select submission to delete",
+            options=[""] + roll_numbers
+        )
+        
+        if selected_roll:
+            submission = next((s for s in lab_manual if s['roll_no'] == selected_roll), None)
+            if submission:
+                st.warning(f"Delete submission for {submission['name']} ({selected_roll})?")
+                
+                if st.button("🗑️ Delete Submission", type="secondary"):
+                    # Archive before deletion
+                    archive_data("lab_manual", submission, "Admin deleted lab manual submission")
+                    
+                    # Remove from data
+                    lab_manual = [s for s in lab_manual if s['roll_no'] != selected_roll]
+                    save_data(lab_manual, LAB_MANUAL_FILE)
+                    
+                    # Delete file if exists
+                    if submission.get('filename'):
+                        file_path = os.path.join(DATA_DIR, "lab_manual", submission['filename'])
+                        if os.path.exists(file_path):
+                            try:
+                                os.remove(file_path)
+                            except Exception as e:
+                                st.error(f"Error deleting file: {e}")
+                    
+                    st.success("✅ Submission deleted successfully!")
+                    st.rerun()
+
+def manage_class_assignments():
+    """Admin panel to manage class assignment submissions"""
+    st.header("📘 Class Assignment Management")
+    
+    # Load config for course name
+    config = load_data(CONFIG_FILE) or {}
+    
+    # Course name configuration
+    st.subheader("Course Configuration")
+    course_name = st.text_input("Course/Subject Name", value=config.get('course_name', ''))
+    
+    if st.button("💾 Save Course Name"):
+        config['course_name'] = course_name
+        if save_data(config, CONFIG_FILE):
+            st.success("Course name saved!")
+    
+    if course_name:
+        st.info(f"**Current Course:** {course_name}")
+    
+    # Load class assignments
+    class_assignments = load_data(CLASS_ASSIGNMENTS_FILE) or []
+    
+    if not class_assignments:
+        st.info("No class assignments submitted yet.")
+        return
+    
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs(["📋 View Submissions", "📥 Download Files", "🗑️ Delete Submissions"])
+    
+    with tab1:
+        # Display all submissions
+        if class_assignments:
+            # Convert to DataFrame for better display
+            df_data = []
+            for submission in class_assignments:
+                df_data.append({
+                    "Name": submission.get('name', ''),
+                    "Roll No": submission.get('roll_no', ''),
+                    "Course": submission.get('course_name', ''),
+                    "Assignment No": submission.get('assignment_no', 1),
+                    "File": submission.get('original_filename', 'No file'),
+                    "File Size": f"{submission.get('file_size', 0) / 1024:.1f} KB" if submission.get('file_size') else "N/A",
+                    "Remarks": submission.get('remarks', ''),
+                    "Submitted": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M')
+                })
+            
+            df = pd.DataFrame(df_data)
+            st.dataframe(df, use_container_width=True)
+            
+            # Statistics
+            st.subheader("📊 Statistics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Submissions", len(class_assignments))
+            with col2:
+                unique_students = len(set([s['roll_no'] for s in class_assignments]))
+                st.metric("Unique Students", unique_students)
+            with col3:
+                assignments_count = len(set([s['assignment_no'] for s in class_assignments]))
+                st.metric("Assignments", assignments_count)
+    
+    with tab2:
+        # Download functionality
+        st.subheader("Download All Class Assignments")
+        
+        # Check if there are files to download
+        submissions_with_files = [s for s in class_assignments if s.get('filename')]
+        
+        if not submissions_with_files:
+            st.warning("No files to download.")
+        else:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("📦 Download All as ZIP", use_container_width=True):
+                    # Create zip of all files
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        class_dir = os.path.join(DATA_DIR, "class_assignments")
+                        if os.path.exists(class_dir):
+                            for submission in submissions_with_files:
+                                filename = submission.get('filename')
+                                if filename:
+                                    file_path = os.path.join(class_dir, filename)
+                                    if os.path.exists(file_path):
+                                        # Create a descriptive name for the file
+                                        new_filename = f"Assignment_{submission['assignment_no']}_{submission['roll_no']}_{submission['name']}_{submission.get('original_filename', filename)}"
+                                        zip_file.write(file_path, new_filename)
+                    
+                    zip_buffer.seek(0)
+                    
+                    # Provide download
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="⬇️ Download ZIP File",
+                        data=zip_buffer,
+                        file_name=f"class_assignments_{timestamp}.zip",
+                        mime="application/zip"
+                    )
+            
+            with col2:
+                if st.button("📊 Export to CSV", use_container_width=True):
+                    if class_assignments:
+                        # Convert to DataFrame
+                        export_data = []
+                        for submission in class_assignments:
+                            export_data.append({
+                                "Name": submission.get('name', ''),
+                                "Roll Number": submission.get('roll_no', ''),
+                                "Course": submission.get('course_name', ''),
+                                "Assignment No": submission.get('assignment_no', ''),
+                                "Filename": submission.get('original_filename', ''),
+                                "File Size": submission.get('file_size', 0),
+                                "Submission Date": submission.get('submission_date', '')
+                            })
+                        
+                        df_export = pd.DataFrame(export_data)
+                        
+                        # Create CSV file in memory
+                        csv_buffer = io.StringIO()
+                        df_export.to_csv(csv_buffer, index=False)
+                        csv_buffer.seek(0)
+                        
+                        # Provide download
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        st.download_button(
+                            label="⬇️ Download CSV File",
+                            data=csv_buffer.getvalue(),
+                            file_name=f"class_assignments_{timestamp}.csv",
+                            mime="text/csv"
+                        )
+    
+    with tab3:
+        # Delete functionality
+        st.subheader("🗑️ Delete Submissions")
+        
+        # Options for deletion
+        delete_option = st.radio(
+            "Delete Options:",
+            ["Delete by Roll Number", "Delete by Assignment Number", "Delete All"]
+        )
+        
+        if delete_option == "Delete by Roll Number":
+            roll_numbers = list(set([s['roll_no'] for s in class_assignments]))
+            selected_roll = st.selectbox("Select Roll Number", options=[""] + roll_numbers)
+            
+            if selected_roll:
+                submissions_to_delete = [s for s in class_assignments if s['roll_no'] == selected_roll]
+                st.warning(f"Found {len(submissions_to_delete)} submission(s) for roll number {selected_roll}")
+                
+                if submissions_to_delete and st.button("🗑️ Delete Submissions", type="secondary"):
+                    # Archive before deletion
+                    for submission in submissions_to_delete:
+                        archive_data("class_assignment", submission, f"Admin deleted class assignment for {selected_roll}")
+                    
+                    # Remove from data
+                    class_assignments = [s for s in class_assignments if s['roll_no'] != selected_roll]
+                    save_data(class_assignments, CLASS_ASSIGNMENTS_FILE)
+                    
+                    # Delete files
+                    for submission in submissions_to_delete:
+                        if submission.get('filename'):
+                            file_path = os.path.join(DATA_DIR, "class_assignments", submission['filename'])
+                            if os.path.exists(file_path):
+                                try:
+                                    os.remove(file_path)
+                                except Exception as e:
+                                    st.error(f"Error deleting file {submission['filename']}: {e}")
+                    
+                    st.success(f"✅ All submissions for {selected_roll} deleted successfully!")
+                    st.rerun()
+        
+        elif delete_option == "Delete by Assignment Number":
+            assignment_nos = list(set([s['assignment_no'] for s in class_assignments]))
+            selected_assignment = st.selectbox("Select Assignment Number", options=[""] + [str(n) for n in assignment_nos])
+            
+            if selected_assignment:
+                selected_assignment = int(selected_assignment)
+                submissions_to_delete = [s for s in class_assignments if s['assignment_no'] == selected_assignment]
+                st.warning(f"Found {len(submissions_to_delete)} submission(s) for assignment {selected_assignment}")
+                
+                if submissions_to_delete and st.button("🗑️ Delete Submissions", type="secondary"):
+                    # Archive before deletion
+                    for submission in submissions_to_delete:
+                        archive_data("class_assignment", submission, f"Admin deleted assignment {selected_assignment}")
+                    
+                    # Remove from data
+                    class_assignments = [s for s in class_assignments if s['assignment_no'] != selected_assignment]
+                    save_data(class_assignments, CLASS_ASSIGNMENTS_FILE)
+                    
+                    # Delete files
+                    for submission in submissions_to_delete:
+                        if submission.get('filename'):
+                            file_path = os.path.join(DATA_DIR, "class_assignments", submission['filename'])
+                            if os.path.exists(file_path):
+                                try:
+                                    os.remove(file_path)
+                                except Exception as e:
+                                    st.error(f"Error deleting file {submission['filename']}: {e}")
+                    
+                    st.success(f"✅ All submissions for assignment {selected_assignment} deleted successfully!")
+                    st.rerun()
+        
+        elif delete_option == "Delete All":
+            st.warning("⚠️ This will delete ALL class assignment submissions!")
+            confirm = st.checkbox("I understand this action cannot be undone")
+            
+            if confirm and st.button("🗑️ Delete All Submissions", type="secondary"):
+                # Archive all data
+                archive_data("class_assignments_all", class_assignments, "Admin deleted all class assignments")
+                
+                # Delete all files
+                class_dir = os.path.join(DATA_DIR, "class_assignments")
+                if os.path.exists(class_dir):
+                    try:
+                        shutil.rmtree(class_dir)
+                        Path(class_dir).mkdir(parents=True, exist_ok=True)
+                    except Exception as e:
+                        st.error(f"Error deleting files: {e}")
+                
+                # Clear data
+                save_data([], CLASS_ASSIGNMENTS_FILE)
+                st.success("✅ All class assignments deleted successfully!")
+                st.rerun()
+
 def manage_form_content():
     """Admin interface to manage form content"""
-    st.header("📝 Form Content Management")
+    st.header("📝 Form Content & Mode Management")
     
     # Load current form content
     form_content = load_data(FORM_CONTENT_FILE) or {}
     config = load_data(CONFIG_FILE) or {}
+    
+    # Mode selection
+    st.subheader("🔄 Submission Mode Configuration")
+    
+    form_mode = st.selectbox(
+        "Select Active Mode",
+        options=["project_allocation", "project_file_submission", "lab_manual", "class_assignment"],
+        index=["project_allocation", "project_file_submission", "lab_manual", "class_assignment"].index(
+            config.get("form_mode", "project_allocation")
+        ) if config.get("form_mode", "project_allocation") in ["project_allocation", "project_file_submission", "lab_manual", "class_assignment"] else 0,
+        help="""Choose the active mode:
+        - Project Allocation: Students view/edit allocations
+        - Project File Submission: Students submit project files
+        - Lab Manual: Simple file submission for lab manuals
+        - Class Assignment: Course assignment submission"""
+    )
+    
+    # Mode-specific settings
+    if form_mode == "project_allocation":
+        st.info("🔧 **Project Allocation Mode Settings**")
+        allow_edit = st.checkbox(
+            "Allow students to edit allocation details",
+            value=config.get("allow_allocation_edit", False),
+            help="When enabled, students can modify their group/project details"
+        )
+        config["allow_allocation_edit"] = allow_edit
+    
+    elif form_mode == "project_file_submission":
+        st.info("🔧 **Project File Submission Mode Settings**")
+        submission_open = st.checkbox(
+            "Open file submission",
+            value=config.get("project_file_submission_open", False),
+            help="When enabled, students can submit project files"
+        )
+        config["project_file_submission_open"] = submission_open
+        
+        if submission_open:
+            # File submission settings
+            file_settings = load_data(FILE_SUBMISSION_FILE) or {}
+            
+            st.markdown("---")
+            st.subheader("File Upload Settings")
+            
+            # Allowed formats
+            default_formats = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv", ".zip", ".rar"]
+            allowed_formats = st.multiselect(
+                "Allowed File Formats",
+                options=default_formats,
+                default=file_settings.get("allowed_formats", default_formats)
+            )
+            
+            # Max file size
+            max_size = st.slider(
+                "Maximum File Size (MB)",
+                min_value=1,
+                max_value=100,
+                value=file_settings.get("max_size_mb", 10)
+            )
+            
+            # Instructions
+            instructions = st.text_area(
+                "Upload Instructions",
+                value=file_settings.get("instructions", "Please upload your project files in the specified formats."),
+                height=100
+            )
+            
+            if st.button("💾 Save File Settings", key="save_file_settings"):
+                file_settings = {
+                    "allowed_formats": allowed_formats,
+                    "max_size_mb": max_size,
+                    "instructions": instructions
+                }
+                if save_data(file_settings, FILE_SUBMISSION_FILE):
+                    st.success("File settings saved!")
+    
+    elif form_mode == "lab_manual":
+        st.info("🔧 **Lab Manual Mode Settings**")
+        lab_open = st.checkbox(
+            "Open lab manual submission",
+            value=config.get("lab_manual_open", False),
+            help="When enabled, students can submit lab manuals"
+        )
+        config["lab_manual_open"] = lab_open
+        
+        file_required = st.checkbox(
+            "File upload required",
+            value=config.get("lab_file_upload_required", False),
+            help="When enabled, students must upload a file"
+        )
+        config["lab_file_upload_required"] = file_required
+    
+    elif form_mode == "class_assignment":
+        st.info("🔧 **Class Assignment Mode Settings**")
+        assignment_open = st.checkbox(
+            "Open class assignment submission",
+            value=config.get("class_assignment_open", False),
+            help="When enabled, students can submit class assignments"
+        )
+        config["class_assignment_open"] = assignment_open
+    
+    # Save mode configuration
+    if st.button("💾 Save Mode Configuration", key="save_mode"):
+        config["form_mode"] = form_mode
+        if save_data(config, CONFIG_FILE):
+            st.success(f"Mode set to: {form_mode.replace('_', ' ').title()}")
+    
+    st.markdown("---")
     
     # Publish/Unpublish toggle
     col1, col2 = st.columns(2)
@@ -781,178 +1878,243 @@ def manage_form_content():
                 status = "published" if form_published else "unpublished"
                 st.success(f"Form {status} successfully!")
     
-    # File submission toggle
     st.markdown("---")
-    st.subheader("📁 File Submission Settings")
     
-    file_submission_enabled = st.toggle(
-        "Enable File Submission for Students",
-        value=config.get("enable_file_submission", False),
-        help="When enabled, students can upload project files"
+    # COVER PAGE CONFIGURATION SECTION
+    st.subheader("📋 Cover Page Configuration")
+    
+    # Load current cover page settings
+    cover = form_content.get("cover_page", {})
+    
+    # Enable/disable cover page
+    cover_enabled = st.checkbox(
+        "Enable Cover Page",
+        value=cover.get("enabled", True),
+        help="Show/hide cover page in student form"
     )
     
-    if st.button("💾 Save File Submission Settings"):
-        config['enable_file_submission'] = file_submission_enabled
-        if save_data(config, CONFIG_FILE):
-            status = "enabled" if file_submission_enabled else "disabled"
-            st.success(f"File submission {status} successfully!")
+    # Cover page title
+    cover_title = st.text_input(
+        "Cover Page Title",
+        value=cover.get("title", "🎓 COAL Project Allocation"),
+        help="Title displayed on cover page"
+    )
     
-    if file_submission_enabled:
-        # File submission settings
-        file_settings = load_data(FILE_SUBMISSION_FILE) or {}
-        
-        st.markdown("---")
-        st.subheader("File Upload Settings")
-        
-        # Allowed formats
-        default_formats = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".csv", ".zip", ".rar"]
-        allowed_formats = st.multiselect(
-            "Allowed File Formats",
-            options=default_formats,
-            default=file_settings.get("allowed_formats", default_formats)
+    # Background and text colors
+    col1, col2 = st.columns(2)
+    with col1:
+        bg_color = st.color_picker(
+            "Background Color",
+            value=cover.get("background_color", "#ffffff"),
+            help="Background color for cover page"
         )
-        
-        # Max file size
-        max_size = st.slider(
-            "Maximum File Size (MB)",
-            min_value=1,
-            max_value=100,
-            value=file_settings.get("max_size_mb", 10)
+    with col2:
+        text_color = st.color_picker(
+            "Text Color",
+            value=cover.get("text_color", "#000000"),
+            help="Text color for cover page"
         )
+    
+    # Save cover page button
+    if st.button("💾 Save Cover Page Settings", key="save_cover_page"):
+        form_content["cover_page"] = {
+            "enabled": cover_enabled,
+            "title": cover_title,
+            "background_color": bg_color,
+            "text_color": text_color,
+            "last_updated": datetime.now().isoformat()
+        }
         
-        # Instructions
-        instructions = st.text_area(
-            "Upload Instructions",
-            value=file_settings.get("instructions", "Please upload your project files in the specified formats."),
-            height=100
-        )
-        
-        if st.button("💾 Save File Settings", key="save_file_settings"):
-            file_settings = {
-                "allowed_formats": allowed_formats,
-                "max_size_mb": max_size,
-                "instructions": instructions
-            }
-            if save_data(file_settings, FILE_SUBMISSION_FILE):
-                st.success("File settings saved!")
+        if save_data(form_content, FORM_CONTENT_FILE):
+            st.success("Cover page settings saved successfully!")
     
     st.markdown("---")
     
-    # Tab for cover page and form header
-    tab1, tab2 = st.tabs(["📄 Cover Page Settings", "🏷️ Form Header Settings"])
+    # FORM HEADER CONFIGURATION SECTION
+    st.subheader("📋 Form Header Configuration")
     
-    with tab1:
-        st.subheader("Cover Page Configuration")
-        
-        cover = form_content.get("cover_page", {})
-        
-        # Enable/disable cover page
-        cover_enabled = st.checkbox(
-            "Enable Cover Page",
-            value=cover.get("enabled", True),
-            help="Show cover page to students"
-        )
-        
-        # Cover page title
-        cover_title = st.text_input(
-            "Cover Page Title",
-            value=cover.get("title", "🎓 Final Year Project Allocation"),
-            help="Main title displayed on cover page"
-        )
-        
-        # Cover page content (Markdown editor)
-        st.markdown("**Cover Page Content (Markdown Supported)**")
-        cover_content = st.text_area(
-            "Content",
-            value=cover.get("content", ""),
-            height=200,
-            help="Use Markdown formatting for better presentation"
-        )
-        
-        # Save button for cover page
-        if st.button("💾 Save Cover Page Settings", key="save_cover"):
-            form_content["cover_page"] = {
-                "enabled": cover_enabled,
-                "title": cover_title,
-                "content": cover_content,
-                "last_updated": datetime.now().isoformat()
-            }
-            if save_data(form_content, FORM_CONTENT_FILE):
-                st.success("Cover page settings saved!")
+    # Load current form header
+    form_header = form_content.get("form_header", {})
     
-    with tab2:
-        st.subheader("Form Header Configuration")
-        
-        header = form_content.get("form_header", {})
-        
-        # Form title
-        form_title = st.text_input(
-            "Form Title",
-            value=header.get("title", "Final Year Project Selection Form"),
-            help="Main title of the form"
-        )
-        
-        # Form description
-        form_description = st.text_area(
-            "Form Description",
-            value=header.get("description", ""),
-            height=100,
-            help="Short description explaining the form's purpose"
-        )
-        
-        # Deadline settings
-        st.subheader("⏰ Deadline Settings")
+    # Form title
+    form_title = st.text_input(
+        "Form Title",
+        value=form_header.get("title", "COAL Project Selection Form"),
+        help="Title displayed at the top of the form"
+    )
+    
+    # Form description
+    form_description = st.text_area(
+        "Form Description",
+        value=form_header.get("description", "Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory."),
+        height=100,
+        help="Description displayed below the form title"
+    )
+    
+    # Deadline settings
+    col1, col2 = st.columns(2)
+    with col1:
         show_deadline = st.checkbox(
             "Show Deadline",
-            value=header.get("show_deadline", True),
-            help="Display submission deadline to students"
+            value=form_header.get("show_deadline", True),
+            help="Show submission deadline to students"
         )
-        
-        if show_deadline:
-            try:
-                deadline_date = datetime.strptime(header.get("deadline", "2024-12-31"), "%Y-%m-%d").date()
-            except:
-                deadline_date = datetime.now().date()
-            deadline = st.date_input(
-                "Submission Deadline",
-                value=deadline_date
-            )
-            deadline_str = deadline.strftime("%Y-%m-%d")
-        else:
-            deadline_str = header.get("deadline", "2024-12-31")
-        
-        # Contact settings
-        st.subheader("📧 Contact Information")
+    with col2:
+        deadline_date = st.text_input(
+            "Deadline Date",
+            value=form_header.get("deadline", "2024-12-31"),
+            help="Format: YYYY-MM-DD"
+        )
+    
+    # Contact settings
+    col3, col4 = st.columns(2)
+    with col3:
         show_contact = st.checkbox(
-            "Show Contact Information",
-            value=header.get("show_contact", True),
-            help="Display contact email to students"
+            "Show Contact Email",
+            value=form_header.get("show_contact", True),
+            help="Show contact email to students"
         )
+    with col4:
+        contact_email = st.text_input(
+            "Contact Email",
+            value=form_header.get("contact_email", "coal@university.edu"),
+            help="Email address for student queries"
+        )
+    
+    # Save form header button
+    if st.button("💾 Save Form Header", key="save_form_header"):
+        form_content["form_header"] = {
+            "title": form_title,
+            "description": form_description,
+            "show_deadline": show_deadline,
+            "deadline": deadline_date,
+            "show_contact": show_contact,
+            "contact_email": contact_email,
+            "last_updated": datetime.now().isoformat()
+        }
         
-        if show_contact:
-            contact_email = st.text_input(
-                "Contact Email",
-                value=header.get("contact_email", "projects@university.edu")
-            )
-        else:
-            contact_email = header.get("contact_email", "projects@university.edu")
-        
-        # Save button for form header
-        if st.button("💾 Save Form Header Settings", key="save_header"):
-            form_content["form_header"] = {
-                "title": form_title,
-                "description": form_description,
-                "show_deadline": show_deadline,
-                "deadline": deadline_str,
-                "show_contact": show_contact,
-                "contact_email": contact_email,
-                "last_updated": datetime.now().isoformat()
-            }
-            if save_data(form_content, FORM_CONTENT_FILE):
-                st.success("Form header settings saved!")
+        if save_data(form_content, FORM_CONTENT_FILE):
+            st.success("Form header saved successfully!")
+    
+    st.markdown("---")
+    
+    # Instructions editing
+    st.subheader("📋 Instructions Configuration")
+    
+    # Load current instructions
+    instructions = form_content.get("instructions", {})
+    
+    # Instructions visibility settings
+    st.write("**Visibility Settings:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        show_in_allocation = st.checkbox(
+            "Show in Project Allocation Mode",
+            value=instructions.get("visibility", {}).get("project_allocation", True),
+            help="Show instructions when in project allocation mode"
+        )
+        show_in_file_submission = st.checkbox(
+            "Show in File Submission Mode",
+            value=instructions.get("visibility", {}).get("project_file_submission", True),
+            help="Show instructions when in project file submission mode"
+        )
+    with col2:
+        show_in_class = st.checkbox(
+            "Show in Class Assignment Mode",
+            value=instructions.get("visibility", {}).get("class_assignment", False),
+            help="Show instructions when in class assignment mode"
+        )
+    
+    # Enable/disable instructions
+    instructions_enabled = st.checkbox(
+        "Enable Instructions",
+        value=instructions.get("enabled", True),
+        help="Enable/disable instructions system"
+    )
+    
+    # Instructions title
+    instructions_title = st.text_input(
+        "Instructions Tab Title",
+        value=instructions.get("title", "ℹ️ Instructions & Guidelines"),
+        help="Title displayed on instructions tab"
+    )
+    
+    # Instructions content (Markdown editor)
+    st.markdown("**Instructions Content (Markdown Supported)**")
+    instructions_content = st.text_area(
+        "Instructions",
+        value=instructions.get("content", """# Instructions & Guidelines
+
+## Submission Process
+
+### Step-by-Step Guide
+
+1. **Form Your Group**
+   - Minimum 1 member required (Group Leader)
+   - Maximum members as set by admin
+   - First member is Group Leader
+   - All members should have unique roll numbers
+
+2. **Select a Project**
+   - Only unselected projects are shown
+   - Each project can be selected only once
+   - Choose carefully - selection is final
+
+3. **Submit Application**
+   - Fill all required fields
+   - Confirm accuracy of information
+   - Submit before deadline
+
+## Important Rules
+
+⚠️ **Project Selection Rules:**
+- Each project can be selected by only ONE group
+- Once selected, project disappears from available list
+- No duplicate roll numbers across groups
+
+⚠️ **Group Formation Rules:**
+- Group Leader is mandatory
+- Minimum 1 member required
+- Roll numbers must be unique within group
+- Cannot edit after submission
+
+⚠️ **After Submission:**
+- Save your Group Number
+- Check allocation table for updates
+- Contact admin for any changes"""),
+        height=400,
+        help="Use Markdown formatting for better presentation"
+    )
+    
+    # Additional notes
+    additional_notes = st.text_area(
+        "Additional Notes (Optional)",
+        value=instructions.get("additional_notes", ""),
+        height=100,
+        help="Additional information shown below instructions"
+    )
+    
+    # Save button for instructions
+    if st.button("💾 Save Instructions", key="save_instructions"):
+        form_content["instructions"] = {
+            "enabled": instructions_enabled,
+            "title": instructions_title,
+            "content": instructions_content,
+            "additional_notes": additional_notes,
+            "visibility": {
+                "project_allocation": show_in_allocation,
+                "project_file_submission": show_in_file_submission,
+                "lab_manual": False,
+                "class_assignment": show_in_class
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+        if save_data(form_content, FORM_CONTENT_FILE):
+            st.success("Instructions saved!")
+    
+    st.markdown("---")
     
     # Reset to defaults button
-    st.markdown("---")
     if st.button("🔄 Reset to Default Content", type="secondary"):
         # Reload default form content
         init_files()
@@ -1348,7 +2510,7 @@ def manage_project_deletion():
                         st.rerun()
 
 def view_deleted_items():
-    """View archived/deleted items"""
+    """View archived/deleted items with option to delete permanently"""
     st.header("🗂️ View Deleted Items")
     
     # Get all archive files
@@ -1365,32 +2527,72 @@ def view_deleted_items():
     # Sort by modification time (newest first)
     archive_files.sort(key=lambda x: os.path.getmtime(os.path.join(ARCHIVE_DIR, x)), reverse=True)
     
+    # Delete all button
+    st.subheader("Delete Options")
+    if st.button("🗑️ Delete All Archived Items", type="secondary"):
+        for filename in archive_files:
+            filepath = os.path.join(ARCHIVE_DIR, filename)
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                st.error(f"Error deleting {filename}: {e}")
+        
+        st.success("✅ All archived items deleted permanently!")
+        st.rerun()
+    
     # Display archive files
+    st.subheader("Archived Items")
     for filename in archive_files:
         filepath = os.path.join(ARCHIVE_DIR, filename)
         try:
             with open(filepath, 'r') as f:
-                archive_data = json.load(f)
+                archive_data_content = json.load(f)
         except Exception as e:
             st.error(f"Error loading {filename}: {e}")
             continue
         
         with st.expander(f"📄 {filename}"):
-            st.json(archive_data, expanded=False)
+            col1, col2 = st.columns([3, 1])
             
-            # Download button
-            try:
-                with open(filepath, 'r') as f:
-                    file_content = f.read()
+            with col1:
+                # Display basic info
+                data_type = archive_data_content.get("data_type", "Unknown")
+                deleted_at = archive_data_content.get("deleted_at", "")
+                reason = archive_data_content.get("reason", "")
                 
-                st.download_button(
-                    label=f"Download {filename}",
-                    data=file_content,
-                    file_name=filename,
-                    mime="application/json"
-                )
-            except Exception as e:
-                st.error(f"Error reading {filename}: {e}")
+                st.write(f"**Type:** {data_type}")
+                st.write(f"**Deleted At:** {deleted_at[:19] if deleted_at else 'Unknown'}")
+                if reason:
+                    st.write(f"**Reason:** {reason}")
+                
+                # Show preview of data
+                if st.checkbox(f"Show data for {filename}", key=f"show_{filename}"):
+                    st.json(archive_data_content, expanded=False)
+            
+            with col2:
+                # Delete button for individual file
+                if st.button(f"🗑️ Delete", key=f"delete_{filename}"):
+                    try:
+                        os.remove(filepath)
+                        st.success(f"✅ {filename} deleted permanently!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting file: {e}")
+                
+                # Download button
+                try:
+                    with open(filepath, 'r') as f:
+                        file_content = f.read()
+                    
+                    st.download_button(
+                        label=f"Download",
+                        data=file_content,
+                        file_name=filename,
+                        mime="application/json",
+                        key=f"download_{filename}"
+                    )
+                except Exception as e:
+                    st.error(f"Error reading {filename}: {e}")
 
 def export_data_section():
     """Export data section - CSV format (no openpyxl required)"""
@@ -1399,7 +2601,7 @@ def export_data_section():
     groups = load_data(GROUPS_FILE) or []
     active_groups = [g for g in groups if not g.get('deleted', False)]
     config = load_data(CONFIG_FILE) or {}
-    max_members = config.get("max_members", 4)
+    max_members = config.get("max_members", 3)
     
     if active_groups:
         # Prepare data for CSV
@@ -1445,7 +2647,7 @@ def export_data_section():
         with col2:
             export_format = st.selectbox(
                 "Export Format",
-                ["CSV File", "Excel File"]
+                ["CSV File"]
             )
         
         # Generate file
@@ -1484,48 +2686,21 @@ def export_data_section():
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            if export_format == "Excel File":
-                try:
-                    # Try to use Excel if openpyxl is available
-                    import openpyxl
-                    filename = f"project_allocations_{timestamp}.xlsx"
-                    
-                    # Save to Excel in memory
-                    from io import BytesIO
-                    excel_bytes = BytesIO()
-                    with pd.ExcelWriter(excel_bytes, engine='openpyxl') as writer:
-                        df_export.to_excel(writer, index=False, sheet_name='Project Allocations')
-                    excel_bytes.seek(0)
-                    
-                    # Create download button
-                    st.download_button(
-                        label="⬇️ Click to Download Excel File",
-                        data=excel_bytes,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
-                    st.success(f"✅ Excel file '{filename}' is ready for download!")
-                    
-                except ImportError:
-                    st.warning("⚠️ openpyxl module not installed. Falling back to CSV format...")
-                    export_format = "CSV File"
+            # Always use CSV format
+            filename = f"project_allocations_{timestamp}.csv"
             
-            if export_format == "CSV File":
-                filename = f"project_allocations_{timestamp}.csv"
-                
-                # Convert to CSV
-                csv_string = df_export.to_csv(index=False)
-                
-                # Create download button
-                st.download_button(
-                    label="⬇️ Click to Download CSV File",
-                    data=csv_string,
-                    file_name=filename,
-                    mime="text/csv"
-                )
-                
-                st.success(f"✅ CSV file '{filename}' is ready for download!")
+            # Convert to CSV
+            csv_string = df_export.to_csv(index=False)
+            
+            # Create download button
+            st.download_button(
+                label="⬇️ Click to Download CSV File",
+                data=csv_string,
+                file_name=filename,
+                mime="text/csv"
+            )
+            
+            st.success(f"✅ CSV file '{filename}' is ready for download!")
     else:
         st.info("No data to export yet.")
 
@@ -1559,7 +2734,7 @@ def admin_dashboard():
     st.title("🛠️ Admin Dashboard")
     
     # Tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
         "🔗 Short URLs", 
         "📝 Form Content", 
         "📋 Project Management", 
@@ -1568,6 +2743,9 @@ def admin_dashboard():
         "👥 Group Submissions", 
         "⚙️ System Configuration",
         "📊 Export Data",
+        "📁 File Submissions",
+        "📚 Lab Manual",
+        "📘 Class Assignments",
         "🔐 Change Password"
     ])
     
@@ -1622,7 +2800,7 @@ def admin_dashboard():
                 else:
                     st.error("Please enter a project name")
         
-        # Display and manage projects
+        # Display and manage projects with DELETE option
         st.subheader("Project List")
         projects = load_data(PROJECTS_FILE) or []
         active_projects = [p for p in projects if not p.get('deleted', False)]
@@ -1646,15 +2824,16 @@ def admin_dashboard():
             df_projects = pd.DataFrame(project_data)
             st.dataframe(df_projects, use_container_width=True)
             
-            # Project management controls
+            # Project management controls with DELETE option
             st.subheader("Manage Projects")
-            col1, col2, col3 = st.columns([2,1,1])
+            
+            col1, col2, col3, col4 = st.columns([2,1,1,1])
             
             with col1:
-                project_to_update = st.selectbox(
-                    "Select Project to Update",
+                project_to_manage = st.selectbox(
+                    "Select Project to Manage",
                     options=[""] + [p['name'] for p in active_projects],
-                    key="update_project_select"
+                    key="manage_project_select"
                 )
             
             with col2:
@@ -1668,17 +2847,48 @@ def admin_dashboard():
                 st.write("")  # Spacing
                 st.write("")  # Spacing
                 if st.button("Update Status", key="update_status_btn"):
-                    if project_to_update:
+                    if project_to_manage:
                         for project in projects:
-                            if project['name'] == project_to_update:
+                            if project['name'] == project_to_manage:
                                 old_status = project['status']
                                 project['status'] = new_status
                                 if save_data(projects, PROJECTS_FILE):
-                                    st.success(f"Status updated from '{old_status}' to '{new_status}' for '{project_to_update}'!")
+                                    st.success(f"Status updated from '{old_status}' to '{new_status}' for '{project_to_manage}'!")
                                     st.rerun()
                                 break
                     else:
                         st.error("Please select a project")
+            
+            with col4:
+                if project_to_manage and st.button("🗑️ Delete Project", type="secondary", key="delete_project_btn"):
+                    # Show delete confirmation
+                    st.warning(f"⚠️ Are you sure you want to delete project '{project_to_manage}'?")
+                    
+                    # Get project details
+                    project_to_delete = next((p for p in projects if p['name'] == project_to_manage), None)
+                    
+                    if project_to_delete:
+                        # Check if project is selected by any group
+                        groups = load_data(GROUPS_FILE) or []
+                        groups_with_project = [g for g in groups if g['project_name'] == project_to_manage and not g.get('deleted', False)]
+                        
+                        if groups_with_project:
+                            st.error(f"Cannot delete! Project is selected by {len(groups_with_project)} group(s).")
+                        else:
+                            # Archive project data
+                            archive_data("project", project_to_delete, "Admin deleted project from management")
+                            
+                            # Mark project as deleted
+                            for i, project in enumerate(projects):
+                                if project['name'] == project_to_manage:
+                                    projects[i]['deleted'] = True
+                                    projects[i]['deleted_at'] = datetime.now().isoformat()
+                                    projects[i]['deleted_reason'] = "Admin deleted from project management"
+                                    break
+                            
+                            if save_data(projects, PROJECTS_FILE):
+                                st.success(f"✅ Project '{project_to_manage}' deleted successfully!")
+                                st.rerun()
         else:
             st.info("No projects added yet. Add your first project above.")
     
@@ -1766,14 +2976,14 @@ def admin_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            # Maximum members configuration - START FROM 1
+            # Maximum members configuration - Admin can set 1 to 10
             st.subheader("Group Size Configuration")
             max_members = st.slider(
                 "Maximum Number of Members per Group",
-                min_value=1,  # CHANGED FROM 4 TO 1
+                min_value=1,
                 max_value=10,
-                value=config.get('max_members', 4),
-                help="Maximum number of members allowed in a group"
+                value=config.get('max_members', 3),
+                help="Set the maximum number of members allowed per group (1-10)"
             )
             
             # Next group number configuration
@@ -1812,8 +3022,20 @@ def admin_dashboard():
     with tab8:
         export_data_section()
     
-    # Tab 9: Change Password
+    # Tab 9: File Submissions (Project Files)
     with tab9:
+        manage_file_submissions()
+    
+    # Tab 10: Lab Manual
+    with tab10:
+        manage_lab_manual()
+    
+    # Tab 11: Class Assignments
+    with tab11:
+        manage_class_assignments()
+    
+    # Tab 12: Change Password
+    with tab12:
         st.header("🔐 Change Admin Password")
         
         with st.form("change_password_form"):
@@ -1842,6 +3064,10 @@ def main():
     # Initialize session state
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
+    if 'group_verified' not in st.session_state:
+        st.session_state.group_verified = False
+    if 'verified_group_number' not in st.session_state:
+        st.session_state.verified_group_number = None
     
     # Get query parameters
     query_params = st.query_params
@@ -1867,14 +3093,16 @@ def main():
     # Check if admin is already logged in
     if st.session_state.logged_in:
         # Show admin dashboard with logout in sidebar
-        st.sidebar.title("🎓 Admin Dashboard")
+        st.sidebar.title("🎓 M. Moiz Admin")
         if st.sidebar.button("🚪 Logout"):
             st.session_state.logged_in = False
+            st.session_state.group_verified = False
+            st.session_state.verified_group_number = None
             st.rerun()
         admin_dashboard()
     else:
         # Show main page with navigation
-        st.sidebar.title("🎓 Project Allocation System")
+        st.sidebar.title("🎓 COAL Project Allocation")
         page = st.sidebar.radio("Navigate to:", ["Student Form", "Admin Login"])
         
         if page == "Student Form":

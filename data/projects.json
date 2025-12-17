@@ -1,142 +1,145 @@
 [
     {
         "name": "Simple Calculator",
-        "status": "Selected",
-        "selected_by": 1,
-        "created_at": "2025-12-15 02:42:11",
+        "status": "Not Selected",
+        "selected_by": 0,
+        "created_at": "2025-12-17 15:11:03",
         "deleted": false
     },
     {
         "name": "Number Converter",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:42:30",
+        "created_at": "2025-12-17 15:11:38",
         "deleted": false
     },
     {
-        "name": "Text-Base Game",
+        "name": "Text-based Game",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:42:46",
+        "created_at": "2025-12-17 15:11:45",
         "deleted": false
     },
     {
         "name": "Fibonacci Series Generator",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:43:37",
+        "created_at": "2025-12-17 15:11:52",
         "deleted": false
     },
     {
         "name": "Palindrome Checker",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:44:26",
+        "created_at": "2025-12-17 15:12:09",
         "deleted": false
     },
     {
         "name": "Prime Number Finder",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:44:38",
+        "created_at": "2025-12-17 15:12:16",
         "deleted": false
     },
     {
         "name": "Matrix Multiplication",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:44:44",
+        "created_at": "2025-12-17 15:12:21",
         "deleted": false
     },
     {
         "name": "Simple Encryption Algorithm",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:44:50",
+        "created_at": "2025-12-17 15:12:28",
         "deleted": false
     },
     {
         "name": "Temperature Converter",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:44:56",
+        "created_at": "2025-12-17 15:12:35",
         "deleted": false
     },
     {
         "name": "Sorting Algorithm Visualization",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:45:48",
+        "created_at": "2025-12-17 15:12:42",
         "deleted": false
     },
     {
         "name": "Snake Game",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:46:01",
+        "created_at": "2025-12-17 15:13:54",
         "deleted": false
     },
     {
         "name": "Digital Clock with Date",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:46:11",
+        "created_at": "2025-12-17 15:14:01",
         "deleted": false
     },
     {
         "name": "Tic-Tac-Toe Game",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:46:21",
+        "created_at": "2025-12-17 15:14:15",
         "deleted": false
     },
     {
         "name": "Simple Chat System",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:46:43",
+        "created_at": "2025-12-17 15:14:34",
         "deleted": false
     },
     {
         "name": "Restaurant Billing System",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:46:54",
+        "created_at": "2025-12-17 15:14:41",
         "deleted": false
     },
     {
         "name": "Student Record Menu",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:47:03",
+        "created_at": "2025-12-17 15:14:49",
         "deleted": false
     },
     {
         "name": "ATM Mini System",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:47:11",
+        "created_at": "2025-12-17 15:15:00",
         "deleted": false
     },
     {
         "name": "Library Menu System",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:47:17",
+        "created_at": "2025-12-17 15:15:13",
         "deleted": false
     },
     {
         "name": "Queue and Stack Implementation",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:47:24",
+        "created_at": "2025-12-17 15:15:20",
         "deleted": false
     },
     {
         "name": "Table Generator",
         "status": "Not Selected",
         "selected_by": 0,
-        "created_at": "2025-12-15 02:47:37",
-        "deleted": false
+        "created_at": "2025-12-17 15:15:26",
+        "deleted": false,
+        "deleted_at": "2025-12-17T16:37:29.111973",
+        "deleted_reason": "Admin deleted from project management",
+        "reactivated_at": "2025-12-17T16:37:33.627453"
     }
 ]

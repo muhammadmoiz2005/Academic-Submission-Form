@@ -1,17 +1,30 @@
 {
-    "cover_page": {
-        "enabled": true,
-        "title": "\ud83c\udf93 COAL Project Allocation",
-        "content": "Each group must have at least 1 member and no more than 3 members.\n\nThe project proposal must include the following details:\n     Project title\n    Names and roll numbers of all group members\n    Objective of the project\n   Tools or platform to be used (e.g., 8086 MASM, TASM, NASM)\n   Brief description or flow of how the project will work\n   Expected output, including an example of input and result\n",
-        "last_updated": "2025-12-15T20:31:23.986247"
-    },
     "form_header": {
         "title": "COAL Project Selection Form",
         "description": "Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory.",
         "show_deadline": true,
-        "deadline": "2025-12-15",
-        "show_contact": false,
-        "contact_email": "projects@university.edu",
-        "last_updated": "2025-12-15T20:32:04.817669"
+        "deadline": "2024-12-31",
+        "show_contact": true,
+        "contact_email": "coal@university.edu"
+    },
+    "instructions": {
+        "enabled": true,
+        "title": "\u2139\ufe0f Instructions & Guidelines",
+        "content": "# Instructions & Guidelines\n\n## Submission Process\n\n### Step-by-Step Guide\n\n1. **Form Your Group**\n   - Minimum 1 member required (Group Leader)\n   - Maximum members as set by admin\n   - First member is Group Leader\n   - All members should have unique roll numbers\n\n2. **Select a Project**\n   - Only unselected projects are shown\n   - Each project can be selected only once\n   - Choose carefully - selection is final\n\n3. **Submit Application**\n   - Fill all required fields\n   - Confirm accuracy of information\n   - Submit before deadline\n\n## Important Rules\n\n\u26a0\ufe0f **Project Selection Rules:**\n- Each project can be selected by only ONE group\n- Once selected, project disappears from available list\n- No duplicate roll numbers across groups\n\n\u26a0\ufe0f **Group Formation Rules:**\n- Group Leader is mandatory\n- Minimum 1 member required\n- Roll numbers must be unique within group\n- Cannot edit after submission\n\n\u26a0\ufe0f **After Submission:**\n- Save your Group Number\n- Check allocation table for updates\n- Contact admin for any changes",
+        "additional_notes": "",
+        "visibility": {
+            "project_allocation": true,
+            "project_file_submission": true,
+            "lab_manual": false,
+            "class_assignment": false
+        },
+        "last_updated": "2025-12-17T22:08:39.393732"
+    },
+    "cover_page": {
+        "enabled": true,
+        "title": "\ud83c\udf93 COAL Project Allocation",
+        "background_color": "#f5f0f0",
+        "text_color": "#000000",
+        "last_updated": "2025-12-17T15:09:51.936533"
     }
 }
