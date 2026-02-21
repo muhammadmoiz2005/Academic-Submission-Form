@@ -1,9 +1,16 @@
 {
+    "cover_page": {
+        "enabled": true,
+        "title": "\ud83c\udf93 Project Allocation",
+        "content": "",
+        "background_color": "#1f2937",
+        "text_color": "#e5e7eb"
+    },
     "form_header": {
-        "title": "COAL Project Selection Form",
+        "title": "Project Selection Form",
         "description": "Please fill in all required fields to submit your project group allocation. All fields marked with * are mandatory.",
-        "show_deadline": true,
-        "deadline": "2024-12-31",
+        "show_deadline": false,
+        "deadline": "",
         "show_contact": true,
         "contact_email": "coal@university.edu"
     },
@@ -11,20 +18,12 @@
         "enabled": true,
         "title": "\u2139\ufe0f Instructions & Guidelines",
         "content": "# Instructions & Guidelines\n\n## Submission Process\n\n### Step-by-Step Guide\n\n1. **Form Your Group**\n   - Minimum 1 member required (Group Leader)\n   - Maximum members as set by admin\n   - First member is Group Leader\n   - All members should have unique roll numbers\n\n2. **Select a Project**\n   - Only unselected projects are shown\n   - Each project can be selected only once\n   - Choose carefully - selection is final\n\n3. **Submit Application**\n   - Fill all required fields\n   - Confirm accuracy of information\n   - Submit before deadline\n\n## Important Rules\n\n\u26a0\ufe0f **Project Selection Rules:**\n- Each project can be selected by only ONE group\n- Once selected, project disappears from available list\n- No duplicate roll numbers across groups\n\n\u26a0\ufe0f **Group Formation Rules:**\n- Group Leader is mandatory\n- Minimum 1 member required\n- Roll numbers must be unique within group\n- Cannot edit after submission\n\n\u26a0\ufe0f **After Submission:**\n- Save your Group Number\n- Check allocation table for updates\n- Contact admin for any changes",
-        "additional_notes": "",
+        "additional_notes": "For any queries or issues, please contact the Class Representative.",
         "visibility": {
             "project_allocation": true,
             "project_file_submission": true,
-            "lab_manual": false,
-            "class_assignment": false
-        },
-        "last_updated": "2025-12-17T22:08:39.393732"
-    },
-    "cover_page": {
-        "enabled": true,
-        "title": "\ud83c\udf93 COAL Project Allocation",
-        "background_color": "#f5f0f0",
-        "text_color": "#000000",
-        "last_updated": "2025-12-17T15:09:51.936533"
+            "lab_manual": true,
+            "class_assignment": true
+        }
     }
 }

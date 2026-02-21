@@ -1,34 +1,43 @@
 [
     {
-        "group_number": 2,
-        "project_name": "Simple Calculator",
-        "status": "Not Selected",
+        "group_number": 1,
+        "project_name": "",
+        "status": "Submitted",
         "members": [
             {
-                "name": "Lish",
-                "roll_no": "1",
+                "name": "admin",
+                "roll_no": "hgh",
                 "is_leader": true
             },
             {
-                "name": "AI",
-                "roll_no": "2",
-                "is_leader": false
-            },
-            {
-                "name": "df",
-                "roll_no": "45",
-                "is_leader": false
-            },
-            {
-                "name": "we",
-                "roll_no": "123",
+                "name": "b",
+                "roll_no": "bb",
                 "is_leader": false
             }
         ],
-        "submission_date": "2025-12-17 22:34:52",
-        "submission_timestamp": "2025-12-17T22:34:52.644003",
+        "submission_date": "2026-02-21 22:12:07",
+        "submission_timestamp": "2026-02-21T22:12:07.165817",
         "deleted": true,
-        "deleted_at": "2025-12-17T22:38:48.985452",
+        "status_updated_at": "2026-02-21T22:15:53.330115",
+        "status_updated_by": "admin",
+        "deleted_at": "2026-02-21T22:16:19.466698",
+        "deleted_reason": ""
+    },
+    {
+        "group_number": 2,
+        "project_name": "yt",
+        "status": "Submitted",
+        "members": [
+            {
+                "name": "4",
+                "roll_no": "4",
+                "is_leader": true
+            }
+        ],
+        "submission_date": "2026-02-21 22:13:51",
+        "submission_timestamp": "2026-02-21T22:13:51.267992",
+        "deleted": true,
+        "deleted_at": "2026-02-21T22:16:35.283781",
         "deleted_reason": ""
     }
 ]

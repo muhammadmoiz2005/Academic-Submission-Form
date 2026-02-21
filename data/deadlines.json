@@ -1,0 +1,22 @@
+{
+    "project_allocation": {
+        "enabled": false,
+        "datetime": "",
+        "message": ""
+    },
+    "project_file_submission": {
+        "enabled": false,
+        "datetime": "",
+        "message": ""
+    },
+    "lab_manual": {
+        "enabled": false,
+        "datetime": "",
+        "message": ""
+    },
+    "class_assignment": {
+        "enabled": false,
+        "datetime": "",
+        "message": ""
+    }
+}

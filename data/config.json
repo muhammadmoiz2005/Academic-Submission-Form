@@ -1,15 +1,37 @@
 {
-    "max_members": 4,
+    "max_members": 3,
     "next_group_number": 3,
     "form_published": true,
     "base_url": "http://localhost:8501",
     "enable_file_submission": false,
-    "form_mode": "project_allocation",
+    "form_mode": "lab_manual",
     "allow_allocation_edit": true,
     "project_file_submission_open": true,
     "lab_manual_open": true,
     "lab_file_upload_required": true,
-    "class_assignment_open": true,
+    "class_assignment_open": false,
     "course_name": "",
-    "lab_subject_name": ""
+    "lab_subject_name": "",
+    "current_assignment_no": 1,
+    "project_allocation_project_optional": false,
+    "tab_visibility": {
+        "project_allocation": {
+            "form": true,
+            "allocations": true,
+            "instructions": true
+        },
+        "project_file_submission": {
+            "form": true,
+            "allocations": true,
+            "instructions": false
+        },
+        "lab_manual": {
+            "form": true,
+            "instructions": false
+        },
+        "class_assignment": {
+            "form": true,
+            "instructions": true
+        }
+    }
 }

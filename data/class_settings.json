@@ -12,7 +12,5 @@
         ".rar"
     ],
     "max_size_mb": 10,
-    "max_files": 5,
-    "allow_multiple_submissions": true,
-    "instructions": "Please upload your project files in the specified formats."
+    "max_files": 3
 }

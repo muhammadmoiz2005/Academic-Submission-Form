@@ -13,7 +13,7 @@ import shutil
 
 # Page configuration
 st.set_page_config(
-    page_title="Academic Projects Portal",
+    page_title="🎓 Academic Projects Portal",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -145,7 +145,7 @@ def get_form_status(form_type):
             return {
                 "open": False,
                 "deadline": deadline,
-                "message": f" Submission deadline has passed on {deadline.strftime('%Y-%m-%d %H:%M')}"
+                "message": f"⛔ Submission deadline has passed on {deadline.strftime('%Y-%m-%d %H:%M')}"
             }
     except:
         return {"open": True, "deadline": None, "message": None}
@@ -194,28 +194,8 @@ def init_files():
         "course_name": "",
         "lab_subject_name": "",
         "current_assignment_no": 1,
-        "project_allocation_project_optional": False,
-        # NEW: tab visibility settings
-        "tab_visibility": {
-            "project_allocation": {
-                "form": True,
-                "allocations": True,
-                "instructions": True
-            },
-            "project_file_submission": {
-                "form": True,
-                "allocations": True,
-                "instructions": True
-            },
-            "lab_manual": {
-                "form": True,
-                "instructions": True
-            },
-            "class_assignment": {
-                "form": True,
-                "instructions": True
-            }
-        }
+        # NEW SETTING: make project selection optional in project allocation form
+        "project_allocation_project_optional": False
     }
     
     # Admin credentials (default: admin/password123)
@@ -1496,31 +1476,16 @@ def student_form_standalone():
     
     # Determine which mode is active
     form_mode = config.get("form_mode", "project_allocation")
-    form_content = load_data(FORM_CONTENT_FILE) or {}
-    
-    # Get tab visibility settings
-    tab_visibility = config.get("tab_visibility", {}).get(form_mode, {})
     
     if form_mode == "project_allocation":
         # MODE A: Project Allocation Mode
+        form_content = load_data(FORM_CONTENT_FILE) or {}
+        
+        # Check if allocation editing is allowed
         allow_edit = config.get("allow_allocation_edit", False)
+        
+        # Check deadline
         status = get_form_status("project_allocation")
-        
-        # Build tabs list based on visibility and allow_edit
-        tabs = []
-        if allow_edit and tab_visibility.get("form", True):
-            tabs.append(("📋 **Project Selection Form**", lambda: display_submission_form(form_content, config)))
-        if tab_visibility.get("allocations", True):
-            tabs.append(("📊 **View Allocations**", display_allocations_table_for_students))
-        if tab_visibility.get("instructions", True):
-            tabs.append(("ℹ️ **Instructions**", lambda: display_instructions(form_content)))
-        
-        # If no tabs enabled, show a message
-        if not tabs:
-            st.warning("⚠️ No tabs are enabled for this mode. Please contact administrator.")
-            return
-        
-        # Show deadline status before tabs
         if not status["open"]:
             st.markdown(f"""
             <div class="error-card">
@@ -1542,31 +1507,32 @@ def student_form_standalone():
             </div>
             """, unsafe_allow_html=True)
         
-        # Create tabs
-        tab_objects = st.tabs([label for label, _ in tabs])
-        for i, (_, func) in enumerate(tabs):
-            with tab_objects[i]:
-                func()
+        if allow_edit:
+            # Show tabs with edit option
+            tab1, tab2, tab3 = st.tabs(["📋 **Project Selection Form**", "📊 **View Allocations**", "ℹ️ **Instructions**"])
+            with tab1:
+                display_submission_form(form_content, config)
+            with tab2:
+                display_allocations_table_for_students()
+            with tab3:
+                display_instructions(form_content)
+        else:
+            # View only mode
+            tab1, tab2 = st.tabs(["📊 **View Allocations**", "ℹ️ **Instructions**"])
+            with tab1:
+                display_allocations_table_for_students()
+            with tab2:
+                display_instructions(form_content)
     
     elif form_mode == "project_file_submission":
         # MODE B: Project File Submission Mode
+        form_content = load_data(FORM_CONTENT_FILE) or {}
+        
+        # Check if submission is open
         submission_open = config.get("project_file_submission_open", False)
+        
+        # Check deadline
         status = get_form_status("project_file_submission")
-        
-        # Build tabs
-        tabs = []
-        if submission_open and tab_visibility.get("form", True):
-            tabs.append(("📁 **Submit Files**", lambda: display_project_file_submission_form(form_content, config)))
-        if tab_visibility.get("allocations", True):
-            tabs.append(("📊 **View Allocations**", display_allocations_table_for_students))
-        if tab_visibility.get("instructions", True):
-            tabs.append(("ℹ️ **Instructions**", lambda: display_instructions(form_content)))
-        
-        if not tabs:
-            st.warning("⚠️ No tabs are enabled for this mode. Please contact administrator.")
-            return
-        
-        # Show deadline status
         if not status["open"]:
             st.markdown(f"""
             <div class="error-card">
@@ -1588,90 +1554,51 @@ def student_form_standalone():
             </div>
             """, unsafe_allow_html=True)
         
-        tab_objects = st.tabs([label for label, _ in tabs])
-        for i, (_, func) in enumerate(tabs):
-            with tab_objects[i]:
-                func()
+        if submission_open:
+            # Show file submission form
+            tab1, tab2, tab3 = st.tabs(["📁 **Submit Files**", "📊 **View Allocations**", "ℹ️ **Instructions**"])
+            with tab1:
+                display_project_file_submission_form(form_content, config)
+            with tab2:
+                display_allocations_table_for_students()
+            with tab3:
+                display_instructions(form_content)
+        else:
+            # Show message that submission is closed
+            st.markdown("""
+            <div class="info-card">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.2rem;">📁</span>
+                    <div>
+                        <strong>Project File Submission</strong>
+                        <p style="margin: 0.5rem 0 0 0;">Project file submission is currently closed.</p>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            tab1, tab2 = st.tabs(["📊 **View Allocations**", "ℹ️ **Instructions**"])
+            with tab1:
+                display_allocations_table_for_students()
+            with tab2:
+                display_instructions(form_content)
     
     elif form_mode == "lab_manual":
         # MODE C: Lab Manual Submission Mode
-        status = get_form_status("lab_manual")
-        
-        tabs = []
-        if tab_visibility.get("form", True):
-            tabs.append(("📚 **Lab Manual Submission**", lab_manual_submission_form))
-        if tab_visibility.get("instructions", True):
-            tabs.append(("ℹ️ **Instructions**", lambda: display_instructions(form_content)))
-        
-        if not tabs:
-            st.warning("⚠️ No tabs are enabled for this mode. Please contact administrator.")
-            return
-        
-        if not status["open"]:
-            st.markdown(f"""
-            <div class="error-card">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 1.5rem;">⛔</span>
-                    <div style="font-size: 1.1rem; font-weight: 600;">{status['message']}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            return
-        
-        if status["message"]:
-            st.markdown(f"""
-            <div class="info-card">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 1.2rem;">⏰</span>
-                    <div>{status['message']}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        tab_objects = st.tabs([label for label, _ in tabs])
-        for i, (_, func) in enumerate(tabs):
-            with tab_objects[i]:
-                func()
+        tab1, tab2 = st.tabs(["📚 **Lab Manual Submission**", "ℹ️ **Instructions**"])
+        with tab1:
+            lab_manual_submission_form()
+        with tab2:
+            form_content = load_data(FORM_CONTENT_FILE) or {}
+            display_instructions(form_content)
     
     elif form_mode == "class_assignment":
         # MODE D: Class Assignment Submission Mode
-        status = get_form_status("class_assignment")
-        
-        tabs = []
-        if tab_visibility.get("form", True):
-            tabs.append(("📘 **Class Assignment Submission**", class_assignment_submission_form))
-        if tab_visibility.get("instructions", True):
-            tabs.append(("ℹ️ **Instructions**", lambda: display_instructions(form_content)))
-        
-        if not tabs:
-            st.warning("⚠️ No tabs are enabled for this mode. Please contact administrator.")
-            return
-        
-        if not status["open"]:
-            st.markdown(f"""
-            <div class="error-card">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 1.5rem;">⛔</span>
-                    <div style="font-size: 1.1rem; font-weight: 600;">{status['message']}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            return
-        
-        if status["message"]:
-            st.markdown(f"""
-            <div class="info-card">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 1.2rem;">⏰</span>
-                    <div>{status['message']}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        tab_objects = st.tabs([label for label, _ in tabs])
-        for i, (_, func) in enumerate(tabs):
-            with tab_objects[i]:
-                func()
+        tab1, tab2 = st.tabs(["📘 **Class Assignment Submission**", "ℹ️ **Instructions**"])
+        with tab1:
+            class_assignment_submission_form()
+        with tab2:
+            form_content = load_data(FORM_CONTENT_FILE) or {}
+            display_instructions(form_content)
 
 def display_project_file_submission_form(form_content, config):
     """Display project file submission form with submission status - MAIN CONTENT AREA"""
@@ -2144,6 +2071,7 @@ def display_submission_form(form_content, config):
     
     # Load configuration
     max_members = config.get("max_members", 3)
+    # NEW: check if project selection is optional
     project_optional = config.get("project_allocation_project_optional", False)
     
     # Load projects
@@ -2262,7 +2190,7 @@ def display_submission_form(form_content, config):
                     project_options_final.insert(0, "")
                 
                 project_choice = st.selectbox(
-                    "**Select Your Project**" + ("" if project_optional else "*"),
+                    "**Select Your Project**" + ("" if project_optional else "***"),
                     options=project_options_final,
                     help="Choose only one project from the available options" + (" (optional)" if project_optional else ""),
                     format_func=lambda x: "No project selected" if x == "" else x
@@ -2543,6 +2471,7 @@ def manage_short_urls():
                 if save_data(short_urls, SHORT_URLS_FILE):
                     st.success(f"✅ New short URL created!")
                     st.rerun()
+        # st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("<hr style='border: 2px solid #374151; border-radius: 5px; margin: 2rem 0;'>", unsafe_allow_html=True)
     
@@ -2779,7 +2708,7 @@ def manage_file_submissions():
         
         status_data.append({
             "Group #": group_num,
-            "Project": group['project_name'] if group['project_name'] else "No project selected",
+            "Project": group['project_name'],
             "Group Leader": leader_name,
             "Files Submitted": len(group_files),
             "Status": "✅ Submitted" if len(group_files) > 0 else "❌ Not Submitted",
@@ -3700,6 +3629,7 @@ def manage_form_settings():
             )
             config["allow_allocation_edit"] = allow_edit
             
+            # NEW: Option to make project selection optional
             project_optional = st.checkbox(
                 "**Make project selection optional**",
                 value=config.get("project_allocation_project_optional", False),
@@ -3904,68 +3834,6 @@ def manage_form_settings():
             if save_data(config, CONFIG_FILE):
                 st.success(f"✅ Mode set to: {form_mode.replace('_', ' ').title()}")
         
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown("<hr style='border: 2px solid #374151; border-radius: 5px; margin: 2rem 0;'>", unsafe_allow_html=True)
-    
-    # NEW: Tab Visibility Settings
-    with st.container():
-        st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin-bottom: 1rem;">📑 Tab Visibility Settings</h3>', unsafe_allow_html=True)
-        st.markdown("""
-        <div class="info-card">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 1.2rem;">ℹ️</span>
-                <div>Enable or disable tabs shown to students for each mode. Changes take effect immediately.</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Initialize tab visibility if not present
-        if "tab_visibility" not in config:
-            config["tab_visibility"] = {
-                "project_allocation": {"form": True, "allocations": True, "instructions": True},
-                "project_file_submission": {"form": True, "allocations": True, "instructions": True},
-                "lab_manual": {"form": True, "instructions": True},
-                "class_assignment": {"form": True, "instructions": True}
-            }
-        
-        visibility = config["tab_visibility"]
-        
-        # Project Allocation tabs
-        with st.expander("📋 **Project Allocation Mode Tabs**", expanded=False):
-            pa = visibility.get("project_allocation", {})
-            pa["form"] = st.checkbox("Show 'Project Selection Form' tab", value=pa.get("form", True), key="pa_form")
-            pa["allocations"] = st.checkbox("Show 'View Allocations' tab", value=pa.get("allocations", True), key="pa_alloc")
-            pa["instructions"] = st.checkbox("Show 'Instructions' tab", value=pa.get("instructions", True), key="pa_inst")
-            visibility["project_allocation"] = pa
-        
-        # Project File Submission tabs
-        with st.expander("📁 **Project File Submission Mode Tabs**", expanded=False):
-            pfs = visibility.get("project_file_submission", {})
-            pfs["form"] = st.checkbox("Show 'Submit Files' tab", value=pfs.get("form", True), key="pfs_form")
-            pfs["allocations"] = st.checkbox("Show 'View Allocations' tab", value=pfs.get("allocations", True), key="pfs_alloc")
-            pfs["instructions"] = st.checkbox("Show 'Instructions' tab", value=pfs.get("instructions", True), key="pfs_inst")
-            visibility["project_file_submission"] = pfs
-        
-        # Lab Manual tabs
-        with st.expander("📚 **Lab Manual Mode Tabs**", expanded=False):
-            lm = visibility.get("lab_manual", {})
-            lm["form"] = st.checkbox("Show 'Lab Manual Submission' tab", value=lm.get("form", True), key="lm_form")
-            lm["instructions"] = st.checkbox("Show 'Instructions' tab", value=lm.get("instructions", True), key="lm_inst")
-            visibility["lab_manual"] = lm
-        
-        # Class Assignment tabs
-        with st.expander("📘 **Class Assignment Mode Tabs**", expanded=False):
-            ca = visibility.get("class_assignment", {})
-            ca["form"] = st.checkbox("Show 'Class Assignment Submission' tab", value=ca.get("form", True), key="ca_form")
-            ca["instructions"] = st.checkbox("Show 'Instructions' tab", value=ca.get("instructions", True), key="ca_inst")
-            visibility["class_assignment"] = ca
-        
-        # Save tab visibility
-        if st.button("💾 **Save Tab Visibility Settings**", key="save_tab_visibility", use_container_width=True, type="primary"):
-            config["tab_visibility"] = visibility
-            if save_data(config, CONFIG_FILE):
-                st.success("✅ Tab visibility settings saved!")
         st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("<hr style='border: 2px solid #374151; border-radius: 5px; margin: 2rem 0;'>", unsafe_allow_html=True)
@@ -4299,6 +4167,7 @@ def manage_project_section():
     
     # Add new project in a card
     with st.expander("➕ **Add New Project**", expanded=False):
+        
         col1, col2 = st.columns([3, 1])
         with col1:
             new_project_name = st.text_input("**Project Name**")
@@ -4586,7 +4455,7 @@ def manage_group_editing():
         
         group_data.append({
             "Group #": group['group_number'],
-            "Project": group['project_name'] if group['project_name'] else "No project selected",
+            "Project": group['project_name'],
             "Group Leader": leader_name,
             "Status": group['status'],
             "Members": len([m for m in group['members'] if m['name'].strip()]),
@@ -4626,7 +4495,7 @@ def manage_group_editing():
                     st.markdown(f"""
                     <div style="background-color: #111827; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                         <div style="font-size: 0.9rem; color: #9ca3af;">Project</div>
-                        <div style="font-weight: 600;">{group_to_edit['project_name'] if group_to_edit['project_name'] else "No project selected"}</div>
+                        <div style="font-weight: 600;">{group_to_edit['project_name']}</div>
                     </div>
                     """, unsafe_allow_html=True)
                     st.markdown(f"""
@@ -4861,7 +4730,8 @@ def view_deleted_items():
                         
                         st.markdown(f"**Type:** {data_type}")
                         st.markdown(f"**Deleted At:** {deleted_at[:19] if deleted_at else 'Unknown'}")
-                        if reason:                            st.markdown(f"**Reason:** {reason}")
+                        if reason:
+                            st.markdown(f"**Reason:** {reason}")
                         
                         # Show preview of data
                         if st.checkbox(f"**Show data for {filename}**", key=f"show_{filename}"):
