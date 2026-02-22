@@ -4896,6 +4896,7 @@ def view_deleted_items():
         st.markdown('</div>', unsafe_allow_html=True)
 
 def export_data_section():
+    
     """Export data section with Submission Tracking System - CSV format - MAIN CONTENT AREA"""
     st.markdown('<h2 class="sub-header">📊 Export Data & Submission Tracking System</h2>', unsafe_allow_html=True)
     
@@ -5001,17 +5002,13 @@ def export_data_section():
                 # Generate filename with timestamp
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
-                if export_format == "Excel":
-                    filename = f"project_allocations_{timestamp}.xlsx"
-                    
-                    # Create Excel file in memory
+            if export_format == "Excel":
+                try:
+                    # Try to use openpyxl
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                         df_export.to_excel(writer, index=False, sheet_name='Project Allocations')
-                    
                     excel_buffer.seek(0)
-                    
-                    # Provide download
                     st.download_button(
                         label="⬇️ **Click to Download Excel File**",
                         data=excel_buffer,
@@ -5019,21 +5016,27 @@ def export_data_section():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
-                else:
-                    # CSV format
-                    filename = f"project_allocations_{timestamp}.csv"
-                    
-                    # Convert to CSV
+                except ImportError:
+                    st.warning("⚠️ Excel export requires 'openpyxl'. Falling back to CSV.")
+                    # Fallback to CSV
                     csv_string = df_export.to_csv(index=False)
-                    
-                    # Create download button
                     st.download_button(
                         label="⬇️ **Click to Download CSV File**",
                         data=csv_string,
-                        file_name=filename,
+                        file_name=filename.replace('.xlsx', '.csv'),
                         mime="text/csv",
                         use_container_width=True
                     )
+            else:
+                # CSV export
+                csv_string = df_export.to_csv(index=False)
+                st.download_button(
+                    label="⬇️ **Click to Download CSV File**",
+                    data=csv_string,
+                    file_name=filename,
+                    mime="text/csv",
+                    use_container_width=True
+                )
                 
                 st.success(f"✅ File '{filename}' is ready for download!")
         else:
