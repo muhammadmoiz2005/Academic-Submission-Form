@@ -4896,32 +4896,30 @@ def view_deleted_items():
         st.markdown('</div>', unsafe_allow_html=True)
 
 def export_data_section():
-    
     """Export data section with Submission Tracking System - CSV format - MAIN CONTENT AREA"""
     st.markdown('<h2 class="sub-header">📊 Export Data & Submission Tracking System</h2>', unsafe_allow_html=True)
-    
+
     # Create tabs for different export options
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📋 **Project Allocations**", 
-        "📁 **Project File Submission**", 
-        "📚 **Lab Manual**", 
+        "📋 **Project Allocations**",
+        "📁 **Project File Submission**",
+        "📚 **Lab Manual**",
         "📘 **Class Assignment**",
         "📈 **Comprehensive Report**"
     ])
-    
+
     with tab1:
         # Project Allocations Export
         st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #374151;">📋 Project Allocations Export</h3>', unsafe_allow_html=True)
-        
+
         groups = load_data(GROUPS_FILE) or []
         active_groups = [g for g in groups if not g.get('deleted', False)]
         config = load_data(CONFIG_FILE) or {}
         max_members = config.get("max_members", 3)
-        
+
         if active_groups:
             # Prepare data for CSV
             csv_data = []
-            
             for group in active_groups:
                 row = {
                     "Group Number": group['group_number'],
@@ -4929,7 +4927,6 @@ def export_data_section():
                     "Project Status": group['status'],
                     "Submission Date": group.get('submission_date', '')
                 }
-                
                 # Add member information
                 for i in range(1, max_members + 1):
                     if i <= len(group['members']):
@@ -4942,34 +4939,22 @@ def export_data_section():
                     else:
                         row[f"Member {i} Name"] = ""
                         row[f"Member {i} Roll No"] = ""
-                
                 csv_data.append(row)
-            
-            # Create DataFrame
+
             df_export = pd.DataFrame(csv_data)
-            
-            # Show preview
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Data Preview</h4>', unsafe_allow_html=True)
             st.dataframe(df_export, use_container_width=True)
-            
-            # Export options
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Export Options</h4>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            
             with col1:
                 include_deleted = st.checkbox("**Include deleted items**", value=False, key="include_deleted_allocations")
-            
             with col2:
-                export_format = st.selectbox(
-                    "**Export Format**",
-                    ["CSV", "Excel"],
-                    key="allocations_format"
-                )
-            
-            # Generate file
+                export_format = st.selectbox("**Export Format**", ["CSV", "Excel"], key="allocations_format")
+
             if st.button("📥 **Generate Export File**", key="generate_allocations", use_container_width=True, type="primary"):
                 if include_deleted:
-                    # Include deleted groups
                     deleted_groups = [g for g in groups if g.get('deleted', False)]
                     for group in deleted_groups:
                         row = {
@@ -4980,8 +4965,6 @@ def export_data_section():
                             "Deleted Reason": group.get('deleted_reason', ''),
                             "Deleted At": group.get('deleted_at', '')
                         }
-                        
-                        # Add member information
                         for i in range(1, max_members + 1):
                             if i <= len(group['members']):
                                 member = group['members'][i-1]
@@ -4993,51 +4976,47 @@ def export_data_section():
                             else:
                                 row[f"Member {i} Name"] = ""
                                 row[f"Member {i} Roll No"] = ""
-                        
                         csv_data.append(row)
-                    
-                    # Update DataFrame
                     df_export = pd.DataFrame(csv_data)
-                
-                # Generate filename with timestamp
+
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
-            if export_format == "Excel":
-                try:
-                    # Try to use openpyxl
-                    excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                        df_export.to_excel(writer, index=False, sheet_name='Project Allocations')
-                    excel_buffer.seek(0)
-                    st.download_button(
-                        label="⬇️ **Click to Download Excel File**",
-                        data=excel_buffer,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                except ImportError:
-                    st.warning("⚠️ Excel export requires 'openpyxl'. Falling back to CSV.")
-                    # Fallback to CSV
+
+                if export_format == "Excel":
+                    filename = f"project_allocations_{timestamp}.xlsx"
+                    try:
+                        excel_buffer = io.BytesIO()
+                        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                            df_export.to_excel(writer, index=False, sheet_name='Project Allocations')
+                        excel_buffer.seek(0)
+                        st.download_button(
+                            label="⬇️ **Click to Download Excel File**",
+                            data=excel_buffer,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                    except ImportError:
+                        st.warning("⚠️ Excel export requires 'openpyxl'. Falling back to CSV.")
+                        filename = f"project_allocations_{timestamp}.csv"
+                        csv_string = df_export.to_csv(index=False)
+                        st.download_button(
+                            label="⬇️ **Click to Download CSV File**",
+                            data=csv_string,
+                            file_name=filename,
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                else:
+                    filename = f"project_allocations_{timestamp}.csv"
                     csv_string = df_export.to_csv(index=False)
                     st.download_button(
                         label="⬇️ **Click to Download CSV File**",
                         data=csv_string,
-                        file_name=filename.replace('.xlsx', '.csv'),
+                        file_name=filename,
                         mime="text/csv",
                         use_container_width=True
                     )
-            else:
-                # CSV export
-                csv_string = df_export.to_csv(index=False)
-                st.download_button(
-                    label="⬇️ **Click to Download CSV File**",
-                    data=csv_string,
-                    file_name=filename,
-                    mime="text/csv",
-                    use_container_width=True
-                )
-                
+
                 st.success(f"✅ File '{filename}' is ready for download!")
         else:
             st.markdown("""
@@ -5052,16 +5031,15 @@ def export_data_section():
             </div>
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     with tab2:
         # Project File Submission Report
         st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #374151;">📁 Project File Submission Report</h3>', unsafe_allow_html=True)
-        
-        # Load data
+
         file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
         groups = load_data(GROUPS_FILE) or []
         active_groups = [g for g in groups if not g.get('deleted', False)]
-        
+
         if not file_submissions:
             st.markdown("""
             <div class="info-card">
@@ -5075,23 +5053,15 @@ def export_data_section():
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Create submission status report
             status_data = []
             for group in active_groups:
                 group_num = group['group_number']
                 group_files = file_submissions.get(str(group_num), [])
-                
-                # Get group leader
-                leader_name = ""
-                for member in group['members']:
-                    if member.get('is_leader'):
-                        leader_name = member['name']
-                        break
-                
-                # Get submission details
+                leader_name = next((m['name'] for m in group['members'] if m.get('is_leader')), "")
                 if group_files:
-                    # Get first and last submission times
                     submission_times = [f.get('uploaded_at', '') for f in group_files if f.get('uploaded_at')]
+                    first_submission_formatted = "Unknown"
+                    last_submission_formatted = "Unknown"
                     if submission_times:
                         try:
                             first_submission = min(submission_times)
@@ -5099,12 +5069,8 @@ def export_data_section():
                             first_submission_formatted = datetime.fromisoformat(first_submission).strftime("%Y-%m-%d %H:%M")
                             last_submission_formatted = datetime.fromisoformat(last_submission).strftime("%Y-%m-%d %H:%M")
                         except:
-                            first_submission_formatted = "Unknown"
-                            last_submission_formatted = "Unknown"
-                    
-                    # Calculate total file size
+                            pass
                     total_size = sum(f.get('size', 0) for f in group_files)
-                    
                     status_data.append({
                         "Group #": group_num,
                         "Project": group['project_name'] if group['project_name'] else "No project selected",
@@ -5128,60 +5094,35 @@ def export_data_section():
                         "Submission Count": 0,
                         "Status": "❌ Not Submitted"
                     })
-            
-            # Sort by group number
+
             status_data.sort(key=lambda x: x['Group #'])
-            
-            # Create DataFrame
             df_status = pd.DataFrame(status_data)
-            
-            # Display report
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Submission Status Report</h4>', unsafe_allow_html=True)
             st.dataframe(df_status, use_container_width=True)
-            
-            # Statistics
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">📊 Statistics</h4>', unsafe_allow_html=True)
             col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                total_groups = len(active_groups)
-                st.metric("Total Groups", total_groups, delta=None, delta_color="normal")
-            
-            with col2:
-                submitted_groups = len([g for g in status_data if g['Files Submitted'] > 0])
-                st.metric("Submitted Groups", submitted_groups, delta=None, delta_color="normal")
-            
-            with col3:
-                not_submitted = total_groups - submitted_groups
-                st.metric("Not Submitted", not_submitted, delta=None, delta_color="normal")
-            
-            with col4:
-                submission_rate = (submitted_groups / total_groups * 100) if total_groups > 0 else 0
-                st.metric("Submission Rate", f"{submission_rate:.1f}%", delta=None, delta_color="normal")
-            
-            # Export options
+            total_groups = len(active_groups)
+            submitted_groups = len([g for g in status_data if g['Files Submitted'] > 0])
+            not_submitted = total_groups - submitted_groups
+            submission_rate = (submitted_groups / total_groups * 100) if total_groups > 0 else 0
+            with col1: st.metric("Total Groups", total_groups)
+            with col2: st.metric("Submitted Groups", submitted_groups)
+            with col3: st.metric("Not Submitted", not_submitted)
+            with col4: st.metric("Submission Rate", f"{submission_rate:.1f}%")
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Export Options</h4>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            
             with col1:
-                report_format = st.selectbox(
-                    "**Report Format**",
-                    ["CSV", "Excel"],
-                    key="project_file_format"
-                )
-            
+                report_format = st.selectbox("**Report Format**", ["CSV", "Excel"], key="project_file_format")
             with col2:
-                report_type = st.selectbox(
-                    "**Report Type**",
-                    ["Summary Report", "Detailed Report"],
-                    key="project_file_type"
-                )
-            
+                report_type = st.selectbox("**Report Type**", ["Summary Report", "Detailed Report"], key="project_file_type")
+
             if st.button("📊 **Generate Submission Report**", key="generate_project_file_report", use_container_width=True, type="primary"):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
+
                 if report_type == "Detailed Report":
-                    # Create detailed report
                     detailed_data = []
                     for group_num, files in file_submissions.items():
                         if files:
@@ -5197,25 +5138,18 @@ def export_data_section():
                                         "Uploaded At": datetime.fromisoformat(file_info.get('uploaded_at', '')).strftime("%Y-%m-%d %H:%M") if file_info.get('uploaded_at') else "Unknown",
                                         "Submission Count": file_info.get('submission_count', 1)
                                     })
-                    
-                    df_detailed = pd.DataFrame(detailed_data)
-                    export_df = df_detailed
-                    filename = f"project_file_submissions_detailed_{timestamp}"
+                    export_df = pd.DataFrame(detailed_data)
+                    filename_base = f"project_file_submissions_detailed_{timestamp}"
                 else:
-                    # Summary report
                     export_df = df_status
-                    filename = f"project_file_submissions_summary_{timestamp}"
-                
+                    filename_base = f"project_file_submissions_summary_{timestamp}"
+
                 if report_format == "Excel":
-                    filename += ".xlsx"
-                    # Create Excel file in memory
+                    filename = filename_base + ".xlsx"
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                         export_df.to_excel(writer, index=False, sheet_name='Project File Submissions')
-                    
                     excel_buffer.seek(0)
-                    
-                    # Provide download
                     st.download_button(
                         label="⬇️ **Download Excel Report**",
                         data=excel_buffer,
@@ -5224,10 +5158,8 @@ def export_data_section():
                         use_container_width=True
                     )
                 else:
-                    # CSV format
-                    filename += ".csv"
+                    filename = filename_base + ".csv"
                     csv_string = export_df.to_csv(index=False)
-                    
                     st.download_button(
                         label="⬇️ **Download CSV Report**",
                         data=csv_string,
@@ -5235,17 +5167,15 @@ def export_data_section():
                         mime="text/csv",
                         use_container_width=True
                     )
-                
                 st.success(f"✅ Report '{filename}' is ready for download!")
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     with tab3:
         # Lab Manual Submission Report
         st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #374151;">📚 Lab Manual Submission Report</h3>', unsafe_allow_html=True)
-        
-        # Load data
+
         lab_manual = load_data(LAB_MANUAL_FILE) or []
-        
+
         if not lab_manual:
             st.markdown("""
             <div class="info-card">
@@ -5259,7 +5189,6 @@ def export_data_section():
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Create report data
             report_data = []
             for submission in lab_manual:
                 report_data.append({
@@ -5272,45 +5201,32 @@ def export_data_section():
                     "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                     "Uploaded By": submission.get('uploaded_by', 'Student')
                 })
-            
-            # Create DataFrame
+
             df_lab = pd.DataFrame(report_data)
-            
-            # Display report
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Lab Manual Submission Report</h4>', unsafe_allow_html=True)
             st.dataframe(df_lab, use_container_width=True)
-            
-            # Statistics
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">📊 Statistics</h4>', unsafe_allow_html=True)
             col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Submissions", len(lab_manual), delta=None, delta_color="normal")
+            with col1: st.metric("Total Submissions", len(lab_manual))
             with col2:
                 with_files = len([s for s in lab_manual if s.get('files') and len(s['files']) > 0])
-                st.metric("With Files", with_files, delta=None, delta_color="normal")
+                st.metric("With Files", with_files)
             with col3:
                 total_files = sum(len(s.get('files', [])) for s in lab_manual)
-                st.metric("Total Files", total_files, delta=None, delta_color="normal")
-            
-            # Export options
+                st.metric("Total Files", total_files)
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Export Options</h4>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            
             with col1:
-                report_format = st.selectbox(
-                    "**Report Format**",
-                    ["CSV", "Excel"],
-                    key="lab_manual_format"
-                )
-            
+                report_format = st.selectbox("**Report Format**", ["CSV", "Excel"], key="lab_manual_format")
             with col2:
                 include_files = st.checkbox("**Include file details**", value=False, key="include_lab_files")
-            
+
             if st.button("📊 **Generate Lab Manual Report**", key="generate_lab_report", use_container_width=True, type="primary"):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
+
                 if include_files:
-                    # Create detailed report with file information
                     detailed_data = []
                     for submission in lab_manual:
                         if submission.get('files'):
@@ -5324,27 +5240,22 @@ def export_data_section():
                                     "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                                     "Uploaded By": submission.get('uploaded_by', 'Student')
                                 })
-                    
                     if detailed_data:
                         export_df = pd.DataFrame(detailed_data)
-                        filename = f"lab_manual_submissions_detailed_{timestamp}"
+                        filename_base = f"lab_manual_submissions_detailed_{timestamp}"
                     else:
                         export_df = df_lab
-                        filename = f"lab_manual_submissions_summary_{timestamp}"
+                        filename_base = f"lab_manual_submissions_summary_{timestamp}"
                 else:
                     export_df = df_lab
-                    filename = f"lab_manual_submissions_summary_{timestamp}"
-                
+                    filename_base = f"lab_manual_submissions_summary_{timestamp}"
+
                 if report_format == "Excel":
-                    filename += ".xlsx"
-                    # Create Excel file in memory
+                    filename = filename_base + ".xlsx"
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                         export_df.to_excel(writer, index=False, sheet_name='Lab Manual Submissions')
-                    
                     excel_buffer.seek(0)
-                    
-                    # Provide download
                     st.download_button(
                         label="⬇️ **Download Excel Report**",
                         data=excel_buffer,
@@ -5353,10 +5264,8 @@ def export_data_section():
                         use_container_width=True
                     )
                 else:
-                    # CSV format
-                    filename += ".csv"
+                    filename = filename_base + ".csv"
                     csv_string = export_df.to_csv(index=False)
-                    
                     st.download_button(
                         label="⬇️ **Download CSV Report**",
                         data=csv_string,
@@ -5364,17 +5273,15 @@ def export_data_section():
                         mime="text/csv",
                         use_container_width=True
                     )
-                
                 st.success(f"✅ Report '{filename}' is ready for download!")
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     with tab4:
         # Class Assignment Submission Report
         st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #374151;">📘 Class Assignment Submission Report</h3>', unsafe_allow_html=True)
-        
-        # Load data
+
         class_assignments = load_data(CLASS_ASSIGNMENTS_FILE) or []
-        
+
         if not class_assignments:
             st.markdown("""
             <div class="info-card">
@@ -5388,7 +5295,6 @@ def export_data_section():
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Create report data
             report_data = []
             for submission in class_assignments:
                 report_data.append({
@@ -5401,49 +5307,32 @@ def export_data_section():
                     "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                     "Uploaded By": submission.get('uploaded_by', 'Student')
                 })
-            
-            # Create DataFrame
+
             df_class = pd.DataFrame(report_data)
-            
-            # Display report
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Class Assignment Submission Report</h4>', unsafe_allow_html=True)
             st.dataframe(df_class, use_container_width=True)
-            
-            # Statistics
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">📊 Statistics</h4>', unsafe_allow_html=True)
             col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Submissions", len(class_assignments), delta=None, delta_color="normal")
+            with col1: st.metric("Total Submissions", len(class_assignments))
             with col2:
                 unique_students = len(set([s['Roll No'] for s in report_data]))
-                st.metric("Unique Students", unique_students, delta=None, delta_color="normal")
+                st.metric("Unique Students", unique_students)
             with col3:
                 assignments_count = len(set([s['Assignment No'] for s in report_data]))
-                st.metric("Assignments", assignments_count, delta=None, delta_color="normal")
-            
-            # Export options
+                st.metric("Assignments", assignments_count)
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Export Options</h4>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            
             with col1:
-                report_format = st.selectbox(
-                    "**Report Format**",
-                    ["CSV", "Excel"],
-                    key="class_assignment_format"
-                )
-            
+                report_format = st.selectbox("**Report Format**", ["CSV", "Excel"], key="class_assignment_format")
             with col2:
-                report_type = st.selectbox(
-                    "**Report Type**",
-                    ["Summary Report", "Detailed Report", "Assignment-wise Report"],
-                    key="class_assignment_type"
-                )
-            
+                report_type = st.selectbox("**Report Type**", ["Summary Report", "Detailed Report", "Assignment-wise Report"], key="class_assignment_type")
+
             if st.button("📊 **Generate Class Assignment Report**", key="generate_class_report", use_container_width=True, type="primary"):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
+
                 if report_type == "Detailed Report":
-                    # Create detailed report with file information
                     detailed_data = []
                     for submission in class_assignments:
                         if submission.get('files'):
@@ -5459,63 +5348,50 @@ def export_data_section():
                                     "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                                     "Uploaded By": submission.get('uploaded_by', 'Student')
                                 })
-                    
                     if detailed_data:
                         export_df = pd.DataFrame(detailed_data)
-                        filename = f"class_assignments_detailed_{timestamp}"
+                        filename_base = f"class_assignments_detailed_{timestamp}"
                     else:
                         export_df = df_class
-                        filename = f"class_assignments_summary_{timestamp}"
-                
+                        filename_base = f"class_assignments_summary_{timestamp}"
                 elif report_type == "Assignment-wise Report":
-                    # Group by assignment number
                     assignment_groups = {}
                     for submission in class_assignments:
-                        assignment_no = submission.get('assignment_no', 1)
-                        if assignment_no not in assignment_groups:
-                            assignment_groups[assignment_no] = {
-                                "Assignment No": assignment_no,
+                        a_no = submission.get('assignment_no', 1)
+                        if a_no not in assignment_groups:
+                            assignment_groups[a_no] = {
+                                "Assignment No": a_no,
                                 "Total Submissions": 0,
                                 "Unique Students": set(),
                                 "Total Files": 0,
-                                "Total Size (MB)": 0
+                                "Total Size": 0
                             }
-                        
-                        assignment_groups[assignment_no]["Total Submissions"] += 1
-                        assignment_groups[assignment_no]["Unique Students"].add(submission['roll_no'])
-                        assignment_groups[assignment_no]["Total Files"] += len(submission.get('files', []))
-                        assignment_groups[assignment_no]["Total Size (MB)"] += sum(f.get('file_size', 0) for f in submission.get('files', []))
-                    
-                    # Convert to list
+                        assignment_groups[a_no]["Total Submissions"] += 1
+                        assignment_groups[a_no]["Unique Students"].add(submission['roll_no'])
+                        assignment_groups[a_no]["Total Files"] += len(submission.get('files', []))
+                        assignment_groups[a_no]["Total Size"] += sum(f.get('file_size', 0) for f in submission.get('files', []))
                     assignment_data = []
-                    for assignment_no, data in assignment_groups.items():
+                    for a_no, data in assignment_groups.items():
                         assignment_data.append({
-                            "Assignment No": assignment_no,
+                            "Assignment No": a_no,
                             "Total Submissions": data["Total Submissions"],
                             "Unique Students": len(data["Unique Students"]),
                             "Submission Rate": f"{(data['Total Submissions'] / len(data['Unique Students']) * 100):.1f}%" if data['Unique Students'] else "0%",
                             "Total Files": data["Total Files"],
-                            "Total Size (MB)": f"{data['Total Size (MB)'] / (1024*1024):.2f}"
+                            "Total Size (MB)": f"{data['Total Size'] / (1024*1024):.2f}"
                         })
-                    
                     export_df = pd.DataFrame(assignment_data)
-                    filename = f"class_assignments_by_assignment_{timestamp}"
-                
+                    filename_base = f"class_assignments_by_assignment_{timestamp}"
                 else:
-                    # Summary report
                     export_df = df_class
-                    filename = f"class_assignments_summary_{timestamp}"
-                
+                    filename_base = f"class_assignments_summary_{timestamp}"
+
                 if report_format == "Excel":
-                    filename += ".xlsx"
-                    # Create Excel file in memory
+                    filename = filename_base + ".xlsx"
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                         export_df.to_excel(writer, index=False, sheet_name='Class Assignments')
-                    
                     excel_buffer.seek(0)
-                    
-                    # Provide download
                     st.download_button(
                         label="⬇️ **Download Excel Report**",
                         data=excel_buffer,
@@ -5524,10 +5400,8 @@ def export_data_section():
                         use_container_width=True
                     )
                 else:
-                    # CSV format
-                    filename += ".csv"
+                    filename = filename_base + ".csv"
                     csv_string = export_df.to_csv(index=False)
-                    
                     st.download_button(
                         label="⬇️ **Download CSV Report**",
                         data=csv_string,
@@ -5535,15 +5409,12 @@ def export_data_section():
                         mime="text/csv",
                         use_container_width=True
                     )
-                
                 st.success(f"✅ Report '{filename}' is ready for download!")
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     with tab5:
         # Comprehensive Report
         st.markdown('<div class="card"><h3 style="color: #e5e7eb; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #374151;">📈 Comprehensive Submission Report</h3>', unsafe_allow_html=True)
-        
-        # Info card
         st.markdown("""
         <div class="info-card">
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -5552,29 +5423,18 @@ def export_data_section():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Load all data
+
         groups = load_data(GROUPS_FILE) or []
         active_groups = [g for g in groups if not g.get('deleted', False)]
         file_submissions = load_data(FILE_SUBMISSIONS_FILE) or {}
         lab_manual = load_data(LAB_MANUAL_FILE) or []
         class_assignments = load_data(CLASS_ASSIGNMENTS_FILE) or []
-        
-        # Create comprehensive data
+
         comprehensive_data = []
-        
-        # Add project groups
         for group in active_groups:
             group_num = group['group_number']
             group_files = file_submissions.get(str(group_num), [])
-            
-            # Get group leader
-            leader_name = ""
-            for member in group['members']:
-                if member.get('is_leader'):
-                    leader_name = member['name']
-                    break
-            
+            leader_name = next((m['name'] for m in group['members'] if m.get('is_leader')), "")
             comprehensive_data.append({
                 "Type": "Project Group",
                 "ID": f"Group {group_num}",
@@ -5586,8 +5446,6 @@ def export_data_section():
                 "Submission Date": group.get('submission_date', ''),
                 "Category": "Project Allocation"
             })
-        
-        # Add lab manual submissions
         for submission in lab_manual:
             comprehensive_data.append({
                 "Type": "Lab Manual",
@@ -5600,8 +5458,6 @@ def export_data_section():
                 "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                 "Category": "Lab Manual"
             })
-        
-        # Add class assignment submissions
         for submission in class_assignments:
             comprehensive_data.append({
                 "Type": "Class Assignment",
@@ -5614,68 +5470,44 @@ def export_data_section():
                 "Submission Date": datetime.fromisoformat(submission.get('submission_date', '')).strftime('%Y-%m-%d %H:%M'),
                 "Category": "Class Assignment"
             })
-        
+
         if comprehensive_data:
-            # Create DataFrame
             df_comprehensive = pd.DataFrame(comprehensive_data)
-            
-            # Display report
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Comprehensive Submission Report</h4>', unsafe_allow_html=True)
             st.dataframe(df_comprehensive, use_container_width=True)
-            
-            # Statistics by category
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">📊 Statistics by Category</h4>', unsafe_allow_html=True)
-            
             categories = df_comprehensive['Category'].unique()
             cols = st.columns(len(categories))
-            
             for idx, category in enumerate(categories):
                 with cols[idx]:
-                    category_data = df_comprehensive[df_comprehensive['Category'] == category]
-                    total = len(category_data)
-                    with_files = len(category_data[category_data['Files Submitted'] > 0])
-                    
-                    st.metric(
-                        label=category,
-                        value=total,
-                        delta=f"{with_files} with files"
-                    )
-            
-            # Export options
+                    cat_data = df_comprehensive[df_comprehensive['Category'] == category]
+                    total = len(cat_data)
+                    with_files = len(cat_data[cat_data['Files Submitted'] > 0])
+                    st.metric(label=category, value=total, delta=f"{with_files} with files")
+
             st.markdown('<h4 style="color: #e5e7eb; margin-bottom: 1rem;">Export Options</h4>', unsafe_allow_html=True)
             col1, col2 = st.columns(2)
-            
             with col1:
-                report_format = st.selectbox(
-                    "**Report Format**",
-                    ["Excel", "CSV"],
-                    key="comprehensive_format"
-                )
-            
+                report_format = st.selectbox("**Report Format**", ["Excel", "CSV"], key="comprehensive_format")
             with col2:
                 include_summary = st.checkbox("**Include summary sheet**", value=True, key="include_summary")
-            
+
             if st.button("📊 **Generate Comprehensive Report**", key="generate_comprehensive", use_container_width=True, type="primary"):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
+
                 if report_format == "Excel":
                     filename = f"comprehensive_submission_report_{timestamp}.xlsx"
-                    
-                    # Create Excel file with multiple sheets
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                        # Main data sheet
                         df_comprehensive.to_excel(writer, index=False, sheet_name='All Submissions')
-                        
                         if include_summary:
-                            # Create summary sheet
                             summary_data = []
                             for category in categories:
-                                category_data = df_comprehensive[df_comprehensive['Category'] == category]
-                                total = len(category_data)
-                                with_files = len(category_data[category_data['Files Submitted'] > 0])
-                                total_files = category_data['Files Submitted'].sum()
-                                
+                                cat_data = df_comprehensive[df_comprehensive['Category'] == category]
+                                total = len(cat_data)
+                                with_files = len(cat_data[cat_data['Files Submitted'] > 0])
+                                total_files = cat_data['Files Submitted'].sum()
                                 summary_data.append({
                                     "Category": category,
                                     "Total Submissions": total,
@@ -5684,21 +5516,14 @@ def export_data_section():
                                     "Total Files": total_files,
                                     "Submission Rate": f"{(with_files / total * 100):.1f}%" if total > 0 else "0%"
                                 })
-                            
                             df_summary = pd.DataFrame(summary_data)
                             df_summary.to_excel(writer, index=False, sheet_name='Summary')
-                            
-                            # Create category-wise sheets
                             for category in categories:
-                                category_df = df_comprehensive[df_comprehensive['Category'] == category]
-                                if len(category_df) > 0:
-                                    # Truncate sheet name if too long
-                                    sheet_name = category[:31] if len(category) > 31 else category
-                                    category_df.to_excel(writer, index=False, sheet_name=sheet_name)
-                    
+                                cat_df = df_comprehensive[df_comprehensive['Category'] == category]
+                                if not cat_df.empty:
+                                    sheet_name = category[:31]
+                                    cat_df.to_excel(writer, index=False, sheet_name=sheet_name)
                     excel_buffer.seek(0)
-                    
-                    # Provide download
                     st.download_button(
                         label="⬇️ **Download Comprehensive Excel Report**",
                         data=excel_buffer,
@@ -5707,10 +5532,8 @@ def export_data_section():
                         use_container_width=True
                     )
                 else:
-                    # CSV format
                     filename = f"comprehensive_submission_report_{timestamp}.csv"
                     csv_string = df_comprehensive.to_csv(index=False)
-                    
                     st.download_button(
                         label="⬇️ **Download Comprehensive CSV Report**",
                         data=csv_string,
@@ -5718,20 +5541,19 @@ def export_data_section():
                         mime="text/csv",
                         use_container_width=True
                     )
-                
                 st.success(f"✅ Comprehensive report '{filename}' is ready for download!")
         else:
             st.markdown("""
-        <div class="info-card">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 1.5rem;">📊</span>
-                <div>
-                    <strong>No Submission Data Available</strong>
-                    <p style="margin: 0.5rem 0 0 0;">No submission data available for comprehensive report.</p>
+            <div class="info-card">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.5rem;">📊</span>
+                    <div>
+                        <strong>No Submission Data Available</strong>
+                        <p style="margin: 0.5rem 0 0 0;">No submission data available for comprehensive report.</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 def manage_system_config():
